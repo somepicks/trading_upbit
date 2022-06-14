@@ -40,7 +40,7 @@ def sell_stg(df,i):
     # quit()
     # df.loc[(df.close > df.band_upper) & (df.rsi > 70) ,'매매신호'] = False
     # df.loc[(df.cmo_20 < df.cmo_30) & (df.hmac_5 <= df.hmao_5) ,'매매신호'] = False
-    df.loc[(df.매수그룹==i)&(df['수익률']>0.7) & (df['수익률'] < df['최고수익률'] * 0.8 ) ,'매도신호'] = True
+    df.loc[(df.매수그룹==i)&(df['수익률']>0.7) & (df['수익률'] < df['최고수익률'] * trail ) ,'매도신호'] = True
 
     # df.loc[(df.close < df.band_middle),'매매신호'] = False
     # df.loc[(df['매매신호'].shift(1)==True),'매매신호'] = False
@@ -128,7 +128,7 @@ def df_back(df,ticker):
             # df.loc[df.매수횟수==1,'최고대비'] = (df['수익률']-df['최고수익률'])/df['최고수익률']
         elif df.loc[idx, '매수횟수'] > 1:
             df.loc[(df.매수그룹 == i) , '매수횟수'] = df.loc[index_shift,'매수횟수']+1
-            df.loc[df.매수그룹 == i, '매수금액'] = round(df.loc[index_shift, '매수금액']*1.2)
+            df.loc[df.매수그룹 == i, '매수금액'] = round(df.loc[index_shift, '매수금액']*bet_muliple)
             df.loc[df.매수그룹 == i, '보유현금'] = df.loc[index_shift, '보유현금'] - df.loc[idx, '매수금액']
             df.loc[idx, '수수료'] = round(df.loc[idx, '매수금액'] * fee_buy * 0.01)
             df.loc[df.매수그룹 == i, '총매수'] = df.loc[idx, '매수금액']+df.loc[index_shift, '총매수']
@@ -199,9 +199,9 @@ def df_back(df,ticker):
     origin_close = df.loc[df.index[-1], 'close']
     origin_ror = round((origin_close-origin_open)/origin_open*100,2)
     max_buy = round(df['총매수'].max(),2)
-    print(f'배팅배수: {bet_m}, rsi: {rsi}, 고저대비: {high_ratio}, 트레일링스탑: {trail}, 수익률: {ror}, 수익금: {benefit}, 수수료: {commission}, 매수횟수: {signal}, 매수최고금액: {max_buy},최고수익률: {maximum}, 최저수익률: {minimum}, 단순보유수익률: {origin_ror} ')
+    print(f'배팅배수: {bet_muliple}, rsi: {rsi}, 고저대비: {high_ratio}, 트레일링스탑: {trail}, 수익률: {ror}, 수익금: {benefit}, 수수료: {commission}, 매수횟수: {signal}, 매수최고금액: {max_buy},최고수익률: {maximum}, 최저수익률: {minimum}, 단순보유수익률: {origin_ror} ')
 
-    df = {'배팅배수':[bet_m],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수횟수':[signal],'매수최고금액':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
+    df = {'배팅배수':[bet_muliple],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수횟수':[signal],'매수최고금액':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
     quit()
     # print(df)
     # quit()
@@ -504,6 +504,9 @@ if __name__ == '__main__':
     loss_per = -1 #손절
     sell_per = 0.7 #매도 수익률
     bet = 1000000 #최초 배팅금액
+    rsi = 30
+    high_ratio = -0.2
+    trail = 0.8
     bet_muliple = 1.2
     signal_buy = 5 #매수신호 시 상한 횟수
     signal_sell = 3 #매도신호 시 상한 횟수
