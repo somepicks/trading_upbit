@@ -13,8 +13,8 @@ def buy_stg(df):
     # df['매매신호'] = True
     df.loc[df.index ,'매수신호'] = True
     # df.loc[(df.hei_close < df.hei_open) & (df.매수신호==True) ,'매수신호'] = np.nan
-    df.loc[(df.rsi>30) & (df.매수신호==True) ,'매수신호'] = np.nan
-    df.loc[(df.고저평균대비등락율>-0.2) & (df.매수신호==True) ,'매수신호'] = np.nan
+    df.loc[(df.rsi>rsi) & (df.매수신호==True) ,'매수신호'] = np.nan
+    df.loc[(df.고저평균대비등락율>high_ratio) & (df.매수신호==True) ,'매수신호'] = np.nan
     # df.loc[(df.hei_close < df.hei_open) & (df.매수신호==True) ,'매수신호'] = np.nan
     # df.loc[(df.rsi > 30) & (df.매수신호==True) ,'매수신호'] = np.nan
 
@@ -40,7 +40,7 @@ def sell_stg(df,i):
     # quit()
     # df.loc[(df.close > df.band_upper) & (df.rsi > 70) ,'매매신호'] = False
     # df.loc[(df.cmo_20 < df.cmo_30) & (df.hmac_5 <= df.hmao_5) ,'매매신호'] = False
-    df.loc[(df.매수그룹==i)&(df['수익률']>0.7) & (df['수익률'] < df['최고수익률'] * trail ) ,'매도신호'] = True
+    df.loc[(df.매수그룹==i)&(df['수익률']>sell_per) & (df['수익률'] < df['최고수익률'] * trail ) ,'매도신호'] = True
 
     # df.loc[(df.close < df.band_middle),'매매신호'] = False
     # df.loc[(df['매매신호'].shift(1)==True),'매매신호'] = False
@@ -87,22 +87,20 @@ def df_back(df,ticker):
     df['매도시간'] = int(0)
     df['보유시간'] = int(0)
 
-    df = df.iloc[315:]
     length = len(df.index)
     ing_before=0
     df=buy_stg(df)
     df.loc[(df['매수신호'].shift(1) > 0) & (df.매수체결가>0), '보유여부'] = True
     df['매수체결가'].ffill(inplace=True) # NaN값을 윗 값으로 채움
-    index = df.index[df['보유여부'] == True]  # 보유여부가 True인 인덱스만 추출
+    index_true = df.index[df['보유여부'] == True]  # 보유여부가 True인 인덱스만 추출
     max_ror = 0
-    # print(idx)
-    for i,idx in enumerate(index):
+    for i,idx in enumerate(index_true):
         df.loc[idx,'매수그룹'] = i
     df['매수그룹'].ffill(inplace=True) # NaN값을 윗 값으로 채움
     df['매수횟수'] = df['매수그룹']+1
     # print(df.index)
     list_index=df.index.to_list()
-    for i, idx in enumerate(index):
+    for i, idx in enumerate(index_true):
         index_shift=df.index[list_index.index(idx)-1] #앞의 인덱스 추출
         # index_final = df.loc[(df.매수그룹==i),'매수그룹'].index[-1] #매수그룹의 마지막 인덱스 추출
         index_x = df.index[df['매수그룹'] == i]  # 매수그룹별 세부인덱스 추출
@@ -128,11 +126,11 @@ def df_back(df,ticker):
             # df.loc[df.매수횟수==1,'최고대비'] = (df['수익률']-df['최고수익률'])/df['최고수익률']
         elif df.loc[idx, '매수횟수'] > 1:
             df.loc[(df.매수그룹 == i) , '매수횟수'] = df.loc[index_shift,'매수횟수']+1
-            df.loc[df.매수그룹 == i, '매수금액'] = round(df.loc[index_shift, '매수금액']*bet_muliple)
+            df.loc[df.매수그룹 == i, '매수금액'] = round(df.loc[index_shift, '매수금액'] * bet_m)
             df.loc[df.매수그룹 == i, '보유현금'] = df.loc[index_shift, '보유현금'] - df.loc[idx, '매수금액']
             df.loc[idx, '수수료'] = round(df.loc[idx, '매수금액'] * fee_buy * 0.01)
             df.loc[df.매수그룹 == i, '총매수'] = df.loc[idx, '매수금액']+df.loc[index_shift, '총매수']
-            df.loc[df.매수그룹 == i, '보유수량'] = round((df.loc[idx, '매수금액']-df.loc[idx, '수수료'])/df.loc[idx, '매수체결가'], 8)+df.loc[index[i-1], '보유수량']
+            df.loc[df.매수그룹 == i, '보유수량'] = round((df.loc[idx, '매수금액']-df.loc[idx, '수수료'])/df.loc[idx, '매수체결가'], 8)+df.loc[index_shift, '보유수량']
             df.loc[df.매수그룹 == i,'총평가'] = round(df['close']*df['보유수량'])
             df.loc[df.매수그룹 == i,'수익률'] = round(((df['총평가']-df['총매수'])/df['총매수']*100)-fee_sell,2)
             df.loc[df.매수그룹 == i,'평가손익'] = round(df['총평가']-df['총매수']-df.loc[idx, '수수료'])
@@ -145,22 +143,13 @@ def df_back(df,ticker):
                 elif df.loc[idx_x, '수익률'] < max_ror:
                     df.loc[idx_x, '최고수익률'] = max_ror
         df = sell_stg(df,i)
-        # df.loc[(df.매수그룹==i) & (df.매도체결가>0),'보유여부'] = False
         # df.loc[(df.매수그룹==i) ,'보유여부'] = df['보유여부'].ffill(inplace=True)  # NaN값을 윗 값으로 채움
-        # df['보유여부'].ffill(inplace=True)  # NaN값을 윗 값으로 채움
         index_false = df.index[(df.매수그룹 == i) & (df.매도체결가>0)]  # 매수그룹별 세부인덱스 추출
         # index_false = (df.loc[(df.매수그룹==i) & (df.매도체결가>0),'매수그룹'])  # 매도체결가가 0 보다 큰 데이터만 추출
-        # print(index_df)
-        # index_final = index_df.index[-1]
-        # print(index_false)
-        # print(index_final)
         if not index_false.empty: #매도 시
             index_false = index_false[0]
             num_index = list_index.index(index_false) #인덱스 리스트의 매도체결 인덱스번호 추출
             index_sold = list_index[num_index+1] #인덱스 번호 다음칸의 인덱스 추출
-            # print(index_false)
-            # print(index_sold)
-            # print(index_final)
             df.loc[index_false,'보유여부'] = False
             sell_price = round(df.loc[index_false,'보유수량']*df.loc[index_false,'매도체결가'])
             df.loc[index_false,'수수료'] = round(sell_price*fee_sell*0.01)
@@ -177,179 +166,30 @@ def df_back(df,ticker):
             df.loc[index_sold:index_final,'평가손익'] = np.nan
             df.loc[df.매수그룹 == i+1, '매수횟수'] = 1
             max_ror = 0
-        # break
-
-        # if i == 1:
-        #     break
-    # df['매수금액'] = df['보유현금'] / money_division
-        # df.loc[(df['매수그룹'].shift(1)==i+1) & df]
-    # for i, idx in enumerate(df.index):
-    #     df.loc[(df.index == idx) & (df.보유여부 == True) & (df['고저평균대비등락율'].shift(1) <= high_ratio), '매수신호'] = True
 
     make_detail_db(df,ticker)
-    commission_sell = df.loc[df.index[-1],'총평가']*fee_sell*0.01
-    wallet = df.loc[df.index[-1],'보유현금'] + df.loc[df.index[-1],'총평가']-commission_sell
+
+    wallet = 0
+    if np.isnan(df.loc[df.index[-1],'매수금액']):
+        wallet = df.loc[df.index[-1],'보유현금']
+
+    if not np.isnan(df.loc[df.index[-1],'매수금액']):         #마지막행 보유 시 일괄 매도
+        commission_sell = round(df.loc[df.index[-1],'총평가']*fee_sell*0.01)
+        wallet = df.loc[df.index[-1],'보유현금'] + df.loc[df.index[-1],'총평가']-commission_sell
+
     benefit =  wallet - bet
     ror = round(benefit/bet*100,2)
     maximum = round(df['수익률'].max(),2)
     minimum = round(df['수익률'].min(),2)
     commission = df['수수료'].sum()
-    signal = df['매수신호'].sum()
+    signal = len(df.loc[df['매수신호']==1])  #매수신호가 1인 값 추출
     origin_open = df.loc[df.index[0], 'open']
     origin_close = df.loc[df.index[-1], 'close']
     origin_ror = round((origin_close-origin_open)/origin_open*100,2)
-    max_buy = round(df['총매수'].max(),2)
-    print(f'배팅배수: {bet_muliple}, rsi: {rsi}, 고저대비: {high_ratio}, 트레일링스탑: {trail}, 수익률: {ror}, 수익금: {benefit}, 수수료: {commission}, 매수횟수: {signal}, 매수최고금액: {max_buy},최고수익률: {maximum}, 최저수익률: {minimum}, 단순보유수익률: {origin_ror} ')
-
-    df = {'배팅배수':[bet_muliple],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수횟수':[signal],'매수최고금액':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
-    quit()
-    # print(df)
-    # quit()
-    for i, idx in enumerate(df.index):
-        ing = round(i / length * 100)
-        if ing_before != ing:
-            ing_before = ing
-            # print(f'진행률: {ing_before}%',end=' ')
-        # 매수
-        # if df.loc[idx,]
-        # if (df.loc[idx, '매수횟수'] == 0):
-        # 수정사항 배팅금액
-        #매수인데 미체결 후 다시 매수
-
-        # def stg_buy(df):
-        df.loc[(df.index == idx) & (df['rsi'].shift(1) < rsi) & (df['고저평균대비등락율'].shift(1) <= high_ratio), '매수신호'] = True
-
-        # df.loc[(df.index == idx) & (df['매수횟수'].shift(1) == 1) & (df['rsi'].shift(1) < 30) & (df['고저평균대비등락율'].shift(1) <= -0.2) & (df['수익률'].shift(1)<-0.2), '매수신호'] = True
-        # df.loc[(df.index == idx) & (df['매수횟수'].shift(1) == 2) & (df['rsi'].shift(1) < 30) & (df['고저평균대비등락율'].shift(1) <= -0.2) & (df['수익률'].shift(1)<-0.2), '매수신호'] = True
-        # df.loc[(df.index == idx) & (df['매수횟수'].shift(1) == 3) & (df['rsi'].shift(1) < 30) & (df['고저평균대비등락율'].shift(1) <= -0.2) & (df['수익률'].shift(1)<-0.2), '매수신호'] = True
-        # df.loc[(df.index == idx) & (df['매수횟수'].shift(1) == 4) & (df['rsi'].shift(1) < 30) & (df['고저평균대비등락율'].shift(1) <= -0.2) & (df['수익률'].shift(1)<-0.2), '매수신호'] = True
-
-        df.loc[(df.index == idx) & (df['매수신호'] == 1), '매수호가'] = df['open'].apply(buy_hoga_return)
-        df.loc[(df.index == idx) & (df['매수신호'] > 1), '매수호가'] = df.loc[df.index[i-1], '매수호가']
-
-        # 매도
-        def stg_sell(df):
-            df.loc[(df.index == idx) & (df['매도신호'].isnull()) & (df['수익률'].shift(1) > 0.7) & (df['수익률'].shift(1) < df['최고수익률'].shift(1) * trail), '매도신호'] = True
-            return df
-        # df = stg_buy(df)
-        df = stg_sell(df)
-        df.loc[(df.index == idx) & (df['매도신호'] == True), '매도호가'] = df['open'].apply(sell_hoga_return)
-        df.loc[(df.index == idx) & (df['매도신호'] > 1), '매도호가'] = df.loc[df.index[i-1], '매도호가']
-
-        # if idx == 20220502011200:
-        #     print(df.loc[idx,'수익률'])
-        #     print(df.loc[idx,'최고수익률'])
-
-        df.loc[idx, '보유여부'] = df.loc[df.index[i - 1], '보유여부']
-        df.loc[idx, '보유현금'] = df.loc[df.index[i - 1], '보유현금']
-        df.loc[idx, '보유수량'] = df.loc[df.index[i - 1], '보유수량']
-        df.loc[idx, '매수횟수'] = df.loc[df.index[i - 1], '매수횟수']
-        df.loc[idx, '매수금액'] = df.loc[df.index[i - 1], '매수금액']
-        df.loc[idx, '총매수'] = df.loc[df.index[i - 1], '총매수']
-
-        # 매수 체결
-        if (df.loc[idx, '매수신호'] > 0):
-            if df.loc[df.index[i], 'low'] < df.loc[df.index[i], '매수호가']:  # 매수 체결
-                df.loc[idx, '보유여부'] = True
-                df.loc[idx, '매수체결가'] = df.loc[idx, '매수호가']
-                df.loc[idx, '매수횟수'] = df.loc[idx, '매수횟수'] + 1
-                df.loc[idx, '매수시간'] = df.index[i]
-                if (df.loc[idx, '매수횟수'] == 1) & ((df.loc[idx, '보유현금'] / money_division) > 5000) :
-                    df.loc[idx, '매수금액'] = round(df.loc[idx, '보유현금'] / money_division)
-                    df.loc[idx, '수수료'] = round(df.loc[idx, '매수금액'] * fee_buy * 0.01)
-                    df.loc[idx, '총매수'] = df.loc[idx, '매수금액']
-                    df.loc[idx, '보유현금'] = df.loc[idx, '보유현금'] - df.loc[idx, '매수금액']
-                    df.loc[idx, '보유수량'] = round((df.loc[idx, '매수금액']-df.loc[idx, '수수료'])/df.loc[idx, '매수체결가'], 8)
-                # elif (df.loc[idx, '매수횟수'] > 1) & (df.loc[idx, '보유현금'] > df.loc[idx, '매수금액']):
-                #     df.loc[idx, '매수금액'] = df.loc[idx, '매수금액'] * 2
-                #     df.loc[idx, '수수료'] = round(df.loc[idx, '매수금액'] * fee_buy * 0.01)
-                #     df.loc[idx, '총매수'] = df.loc[idx, '매수금액'] + df.loc[idx, '총매수']
-                #     df.loc[idx, '보유현금'] = df.loc[idx, '보유현금'] - df.loc[idx, '매수금액']
-                #     df.loc[idx, '보유수량'] = round(df.loc[idx, '보유수량']+(df.loc[idx, '매수금액']-df.loc[idx, '수수료'])/df.loc[idx, '매수체결가'], 8)
-                elif (df.loc[idx, '매수횟수'] > 1) & (df.loc[idx, '보유현금'] > df.loc[idx, '매수금액']):
-                    df.loc[idx, '매수금액'] = round(df.loc[idx, '매수금액']*bet_m)
-                    df.loc[idx, '수수료'] = round(df.loc[idx, '매수금액'] * fee_buy * 0.01)
-                    df.loc[idx, '총매수'] = df.loc[idx, '매수금액'] + df.loc[idx, '총매수']
-                    df.loc[idx, '보유현금'] = df.loc[idx, '보유현금'] - df.loc[idx, '매수금액']
-                    df.loc[idx, '보유수량'] = round(df.loc[idx, '보유수량']+(df.loc[idx, '매수금액']-df.loc[idx, '수수료'])/df.loc[idx, '매수체결가'], 8)
-                else:
-                    quit()
-            elif df.loc[idx, '매수신호'] == signal_buy:  # 매수 횟수 초과 시
-                # print('매수취소')
-                df.loc[df.index[i + 1], '매수신호'] = np.nan
-            elif df.loc[df.index[i], 'low'] >= df.loc[df.index[i], '매수호가']:  # 매수 미체결
-                # print('미체결')
-                df.loc[df.index[i+1], '매수신호'] = df.loc[idx, '매수신호'] + 1
-            # print(f"매수횟수: {df.loc[idx,'매수횟수']}")
-
-
-        # 매도 체결
-        elif (df.loc[idx, '매도신호'] >= 0):
-            if df.loc[df.index[i], 'high'] > df.loc[df.index[i], '매도호가']:  # 매도 체결
-                df.loc[idx, '보유여부'] = False
-                df.loc[idx, '매도체결가'] = df.loc[idx, '매도호가']
-                df.loc[idx, '수수료'] = round(df.loc[idx, '총매수'] * fee_sell * 0.01)
-                df.loc[idx, '보유현금'] = df.loc[idx, '보유현금'] + \
-                                      round(df.loc[idx, '매도체결가'] * df.loc[idx, '보유수량'] - df.loc[idx, '수수료'])
-                df.loc[idx, '매수횟수'] = 0
-                df.loc[idx, '총매수'] = np.nan
-                df.loc[idx, '매수금액'] = np.nan
-                df.loc[idx, '보유수량'] = np.nan
-                df.loc[idx, '총평가'] = 0
-
-                df.loc[idx, '매도시간'] = df.index[i]
-            elif df.loc[idx, '매도신호'] == signal_sell :  # 매도 횟수 초과 시
-                # print('매도횟수 초과: ',end='')
-                df.loc[idx, '매도신호'] = np.nan
-                df = stg_sell(df)
-                if df.loc[idx, '매도신호'] == True:
-                    # print('open가 매도')
-                    df.loc[idx, '보유여부'] = False
-                    df.loc[idx, '매도체결가'] = df.loc[idx, 'open'] #시작가로 다 던지기
-                    df.loc[idx, '수수료'] = round(df.loc[idx, '총매수'] * fee_sell * 0.01)
-                    df.loc[idx, '보유현금'] = df.loc[idx, '보유현금'] + \
-                                          round(df.loc[idx, '매도체결가'] * df.loc[idx, '보유수량'] - df.loc[idx, '수수료'])
-                    df.loc[idx, '매수횟수'] = 0
-                    df.loc[idx, '총매수'] = np.nan
-                    df.loc[idx, '매수금액'] = np.nan
-                    df.loc[idx, '보유수량'] = np.nan
-                    df.loc[idx, '매도시간'] = df.index[i]
-                    df.loc[idx, '총평가'] = 0
-                else:
-                    df.loc[df.index[i+1], '매도신호'] = np.nan  # 매도 취소
-                    # print('매도취소')
-            elif df.loc[df.index[i], 'high'] <= df.loc[df.index[i], '매도호가']:  # 매도 미체결
-                # print('미체결')
-                df.loc[df.index[i+1], '매도신호'] = df.loc[idx, '매도신호'] + 1
-        # 보유
-        if df.loc[idx, '보유여부'] == True:  # 보유
-            close = df.loc[idx, 'close']
-            price = df.loc[idx, '총매수']
-            volume = df.loc[idx, '보유수량']
-            evalue = round(close * volume)  # 총평가
-            df.loc[idx, '총평가'] = round(close * volume)
-            df.loc[idx, '수익률'] = round((evalue - price) / price, 3) * 100 - fee_sell
-            df.loc[idx, '평가손익'] = round(evalue - price - fee_sell)
-            if df.loc[idx, '수익률'] >= df.loc[df.index[i - 1], '최고수익률']:
-                df.loc[idx, '최고수익률'] = df.loc[idx, '수익률']
-            else:
-                df.loc[idx, '최고수익률'] = df.loc[df.index[i - 1], '최고수익률']
-    make_detail_db(df,ticker)
-    wallet = df.loc[df.index[-1],'보유현금'] + df.loc[df.index[-1],'총평가']
-    benefit =  wallet - bet
-    ror = round(benefit/bet*100,2)
-    maximum = round(df['수익률'].max(),2)
-    minimum = round(df['수익률'].min(),2)
-    commission = df['수수료'].sum()
-    signal = df['매수신호'].sum()
-    origin_open = df.loc[df.index[0], 'open']
-    origin_close = df.loc[df.index[-1], 'close']
-    origin_ror = round((origin_close-origin_open)/origin_open*100,2)
-    max_buy = round(df['총매수'].max(),2)
-    print(f'배팅배수: {bet_m}, rsi: {rsi}, 고저대비: {high_ratio}, 트레일링스탑: {trail}, 수익률: {ror}, 수익금: {benefit}, 수수료: {commission}, 매수횟수: {signal}, 매수최고금액: {max_buy},최고수익률: {maximum}, 최저수익률: {minimum}, 단순보유수익률: {origin_ror} ')
-
-    df = {'배팅배수':[bet_m],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수횟수':[signal],'매수최고금액':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
-    # print(df)
+    max_bet = round(df['총매수'].max(),2)
+    max_buy = round(df['매수횟수'].max(),2)
+    print(f'배팅배수: {bet_m}, rsi: {rsi}, 고저대비: {high_ratio}, 트레일링스탑: {trail}, 수익률: {ror}, 수익금: {benefit}, 수수료: {commission}, 매수신호횟수: {signal},매수체결횟수:{}, 매수최고금액: {max_bet}, 최대매수횟수: {max_buy}최고수익률: {maximum}, 최저수익률: {minimum}, 단순보유수익률: {origin_ror} ')
+    df = {'배팅배수':[bet_m],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수신호횟수':[signal],'매수최고금액':[max_bet],'최대매수횟수':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
 
     return df
 def make_back_db(df):
@@ -393,7 +233,7 @@ def make_back_db(df):
     con.close()
     return df_result
 def make_detail_db(df,ticker):
-    con = sqlite3.connect(db_path+'upbit_back_grid.db')
+    con = sqlite3.connect(db_path+'upbit_back_grid_detail.db')
     df.to_sql(ticker, con, if_exists='replace')
     con.commit()
     con.close()
@@ -498,57 +338,57 @@ if __name__ == '__main__':
     con = sqlite3.connect(db_path+'upbit.db')
     cur = con.cursor()
 
+    # interval = 'minute3'
+    # buy_hoga = -1 #매수호가
+    # sell_hoga = 1 #매도호가
+    # loss_per = -1 #손절
+    # sell_per = 0.7 #매도 수익률
+    # bet = 1000000 #최초 배팅금액
+    # rsi = 30
+    # high_ratio = -0.2
+    # trail = 0.8
+    # bet_muliple = 1.2
+    # signal_buy = 5 #매수신호 시 상한 횟수
+    # signal_sell = 3 #매도신호 시 상한 횟수
+
+
     interval = 'minute3'
     buy_hoga = -1 #매수호가
     sell_hoga = 1 #매도호가
-    loss_per = -1 #손절
     sell_per = 0.7 #매도 수익률
     bet = 1000000 #최초 배팅금액
-    rsi = 30
-    high_ratio = -0.2
-    trail = 0.8
-    bet_muliple = 1.2
+    bet_multiple = [1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,2.1,2.2,2.3,2.4,2.5]
+    rsis = [25,26,27,28,29,30,31,32,33,34,35]
+    high_ratios = [-0.25,-0.24,-0.23,-0.22,-0.21,-0.2,-0.19,-0.18,-0.17,-0.16,-0.15]
+    trailings = [0.9,0.95,0.85,0.8,0.75,0.7]
     signal_buy = 5 #매수신호 시 상한 횟수
     signal_sell = 3 #매도신호 시 상한 횟수
     money_division = 100
+
+
+
     fee_buy = 0.05 # %
     fee_sell = 0.05 # %
-
-
-    # interval = 'minute3'
-    # buy_hoga = -2 #매수호가
-    # sell_hoga = 1 #매도호가
-    # sell_per = 0.7 #매도 수익률
-    # bet = 1000000 #최초 배팅금액
-    # bet_multiple = [1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,2.1,2.2,2.3,2.4,2.5]
-    # rsis = [25,26,27,28,29,30,31,32,33,34,35]
-    # high_ratios = [-0.25,-0.24,-0.23,-0.22,-0.21,-0.2,-0.19,-0.18,-0.17,-0.16,-0.15]
-    # trailing = [0.9,0.95,0.85,0.8,0.75,0.7]
-    # signal_buy = 5 #매수신호 시 상한 횟수
-    # signal_sell = 3 #매도신호 시 상한 횟수
-    # money_division = 100
-    # # tickers = get_ticker_list(cur,interval)
-    # df_amount = pd.DataFrame()
+    # tickers = get_ticker_list(cur,interval)
+    df_amount = pd.DataFrame()
     table_list= get_ticker_list(cur,interval)
     print(table_list)
-    # print(exist_list)
-    # quit()
-        # tickers =['AVAX-'+interval,'ALGO-'+interval,'GLM-'+interval,'SRM-'+interval,'TON-'+interval,'BAT-'+interval]
+    # tickers =['AVAX-'+interval,'ALGO-'+interval,'GLM-'+interval,'SRM-'+interval,'TON-'+interval,'BAT-'+interval]
     for ticker in table_list:
         start = time.time()
         df = pd.read_sql(f"SELECT * FROM '{ticker}'", con).set_index('index')
         df = df.iloc[1070:]
-        # for bet_m in bet_multiple:
-        #     for rsi in rsis:
-        #         for high_ratio in high_ratios:
-        #             for trail in trailing:
-        result = df_back(df,ticker)
-        dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
-        result = pd.DataFrame(result,index=[dt_now])
-        back_grid_con = sqlite3.connect(db_path + 'upbit_back_grid.db')
-        result.to_sql('test',back_grid_con,if_exists='append')
-        back_grid_con.commit()
-        back_grid_con.close()
+        for bet_m in bet_multiple:
+            for rsi in rsis:
+                for high_ratio in high_ratios:
+                    for trail in trailings:
+                        result = df_back(df,ticker)
+                        dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
+                        result = pd.DataFrame(result,index=[dt_now])
+                        back_grid_con = sqlite3.connect(db_path + 'upbit_back.db')
+                        result.to_sql('test',back_grid_con,if_exists='append')
+                        back_grid_con.commit()
+                        back_grid_con.close()
 
     con.close()
     # df_result = make_back_db(df_amount)
