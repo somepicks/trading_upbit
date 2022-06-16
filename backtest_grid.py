@@ -183,13 +183,14 @@ def df_back(df,ticker):
     minimum = round(df['수익률'].min(),2)
     commission = df['수수료'].sum()
     signal = len(df.loc[df['매수신호']==1])  #매수신호가 1인 값 추출
+    che = len(df.loc[df['보유여부']==1])  #보유여부가 1인 값 추출
     origin_open = df.loc[df.index[0], 'open']
     origin_close = df.loc[df.index[-1], 'close']
     origin_ror = round((origin_close-origin_open)/origin_open*100,2)
     max_bet = round(df['총매수'].max(),2)
     max_buy = round(df['매수횟수'].max(),2)
-    print(f'배팅배수: {bet_m}, rsi: {rsi}, 고저대비: {high_ratio}, 트레일링스탑: {trail}, 수익률: {ror}, 수익금: {benefit}, 수수료: {commission}, 매수신호횟수: {signal},매수체결횟수:{}, 매수최고금액: {max_bet}, 최대매수횟수: {max_buy}최고수익률: {maximum}, 최저수익률: {minimum}, 단순보유수익률: {origin_ror} ')
-    df = {'배팅배수':[bet_m],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수신호횟수':[signal],'매수최고금액':[max_bet],'최대매수횟수':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
+    print(f'배팅배수: {bet_m}, rsi: {rsi}, 고저대비: {high_ratio}, 트레일링스탑: {trail}, 수익률: {ror}, 수익금: {benefit}, 수수료: {commission}, 매수신호횟수: {signal},매수체결횟수:{che}, 매수최고금액: {max_bet}, 최대매수횟수: {max_buy}최고수익률: {maximum}, 최저수익률: {minimum}, 단순보유수익률: {origin_ror} ')
+    df = {'배팅배수':[bet_m],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수신호횟수':[signal],'매수체결횟수':[che],'매수최고금액':[max_bet],'최대매수횟수':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
 
     return df
 def make_back_db(df):
@@ -360,7 +361,7 @@ if __name__ == '__main__':
     bet_multiple = [1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,2.1,2.2,2.3,2.4,2.5]
     rsis = [25,26,27,28,29,30,31,32,33,34,35]
     high_ratios = [-0.25,-0.24,-0.23,-0.22,-0.21,-0.2,-0.19,-0.18,-0.17,-0.16,-0.15]
-    trailings = [0.9,0.95,0.85,0.8,0.75,0.7]
+    trailings = [0.90,0.95,0.85,0.80,0.75,0.70]
     signal_buy = 5 #매수신호 시 상한 횟수
     signal_sell = 3 #매도신호 시 상한 횟수
     money_division = 100
@@ -377,7 +378,7 @@ if __name__ == '__main__':
     for ticker in table_list:
         start = time.time()
         df = pd.read_sql(f"SELECT * FROM '{ticker}'", con).set_index('index')
-        df = df.iloc[1070:]
+        df = df.iloc[:]
         for bet_m in bet_multiple:
             for rsi in rsis:
                 for high_ratio in high_ratios:
@@ -386,7 +387,7 @@ if __name__ == '__main__':
                         dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
                         result = pd.DataFrame(result,index=[dt_now])
                         back_grid_con = sqlite3.connect(db_path + 'upbit_back.db')
-                        result.to_sql('test',back_grid_con,if_exists='append')
+                        result.to_sql(ticker+'backteset_grid',back_grid_con,if_exists='append')
                         back_grid_con.commit()
                         back_grid_con.close()
 
