@@ -12,10 +12,7 @@ import talib
 pd.set_option('mode.chained_assignment',  None) # SettingWithCopyWarning 경고를 끈다
 import sqlite3
 # system_path = 'C:/Users/vosan/PycharmProjects/pythonProject/digital_currency/trading_upbit/back_test/db/'
-con = sqlite3.connect('upbit.db')
-cur = con.cursor()
-tickers = pyupbit.get_tickers()
-avgtime = 30
+
 def renko1(df):
     # https://pypi.org/project/mplfinance/
     # https://github.com/matplotlib/mplfinance/issues/63
@@ -188,10 +185,10 @@ def change_price(df):
     df['등락'] = (df['close']-df['open'])/df['open']*100
     return df
 def sma(df):
-    df['ma'] = round(talib.MA(df['close'], timeperiod=avgtime),1)
     df['ma5'] = round(talib.MA(df['close'], timeperiod=5),1)
     df['ma20'] = round(talib.MA(df['close'], timeperiod=20),1)
     df['ma60'] = round(talib.MA(df['close'], timeperiod=60),1)
+    df['ma90'] = round(talib.MA(df['close'], timeperiod=90),1)
     df['ma300'] = round(talib.MA(df['close'], timeperiod=300),1)
     df['ma60마지'] = round(df['ma60']*0.98,1)
     df['ma300마지'] = round(df['ma300']*0.98,1)
@@ -221,7 +218,10 @@ def ATR(df):
     return df
 
 if __name__ == '__main__':
-
+    db_path = 'D:/db_files/'
+    con = sqlite3.connect(db_path+'upbit.db')
+    cur = con.cursor()
+    tickers = pyupbit.get_tickers()
     interval = 'day'  #분봉
     candle = "minute" + interval
     df = pyupbit.get_ohlcv(ticker="KRW-BTC", interval=candle, count=900) # 봉 데이터 ("minute5", "minute10" , "minute30" , "minute60" , "week" , "month"

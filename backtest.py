@@ -282,10 +282,10 @@ def loss_hogaPriceReturn_per(currentPrice): #퍼센트로 반환
             return round(minPrice, 2)
 
 if __name__ == '__main__':
-    path = "D:/db_files"
-    stock_tick_file = path + '/upbit.db'
-    back_file = path + '/upbit_backtest.db'
-    back_detail_file = path + '/upbit_backtest_detail.db'
+    db_path = "D:/db_files"
+    stock_tick_file = db_path + '/upbit.db'
+    back_file = db_path + '/upbit_backtest.db'
+    back_detail_file = db_path + '/upbit_backtest_detail.db'
     coin_con = sqlite3.connect(stock_tick_file)
     cur = coin_con.cursor()
 
@@ -296,7 +296,7 @@ if __name__ == '__main__':
     sell_per = 0.7
     bet = 10000
     # tickers = get_ticker_list(cur,interval)
-    tickers =['BTC-'+interval]
+    tickers =['XRP-'+interval]
     # tickers =['AVAX-'+interval,'ALGO-'+interval,'GLM-'+interval,'SRM-'+interval,'TON-'+interval,'BAT-'+interval]
     df_amount = pd.DataFrame()
     for ticker in tickers:

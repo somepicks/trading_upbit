@@ -62,7 +62,7 @@ def sell_stg(df,i):
 
     return df
 
-def df_back(df,ticker):
+def df_backtest(df,ticker):
     df = df[['open', 'high', 'low', 'close','rsi', '고저평균대비등락율',]]
     df['매수신호'] = np.nan
     df['매수호가'] = np.nan
@@ -167,7 +167,9 @@ def df_back(df,ticker):
             df.loc[df.매수그룹 == i+1, '매수횟수'] = 1
             max_ror = 0
 
-    make_detail_db(df,ticker)
+    df.loc[(df.보유여부==1),'매수시간'] = pd.Series(df.index,index=df.index)
+    df.loc[(df.보유여부==0),'매도시간'] = pd.Series(df.index,index=df.index)
+
 
     wallet = 0
     if np.isnan(df.loc[df.index[-1],'매수금액']):
@@ -190,20 +192,22 @@ def df_back(df,ticker):
     max_bet = round(df['총매수'].max(),2)
     max_buy = round(df['매수횟수'].max(),2)
     print(f'배팅배수: {bet_m}, rsi: {rsi}, 고저대비: {high_ratio}, 트레일링스탑: {trail}, 수익률: {ror}, 수익금: {benefit}, 수수료: {commission}, 매수신호횟수: {signal},매수체결횟수:{che}, 매수최고금액: {max_bet}, 최대매수횟수: {max_buy}최고수익률: {maximum}, 최저수익률: {minimum}, 단순보유수익률: {origin_ror} ')
-    df = {'배팅배수':[bet_m],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수신호횟수':[signal],'매수체결횟수':[che],'매수최고금액':[max_bet],'최대매수횟수':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
+    df_result = {'배팅배수':[bet_m],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수신호횟수':[signal],'매수체결횟수':[che],'매수최고금액':[max_bet],'최대매수횟수':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
 
-    return df
+    return df,df_result
 def make_back_db(df):
-    con = sqlite3.connect('backtest.db')
+    con = sqlite3.connect(back_file)
     dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
     # dt_now = 'coins_vj_'+ dt_now[0:16]
     # table = 'coins_vj_'+ dt_now
+    df.dropna(subset=['보유여부'],axis=0,inplace=True)
+    print(df)
     ror = df['수익률'].mean()
     benefit = df['수익금'].sum()
-    plus=df[df['수익률'] > 0]
-    minus=df[df['수익률'] < 0]
-    df['interval']=interval
-    df['수익금합계']=df['수익금'].cumsum()
+    plus = df[df['수익률'] > 0]
+    minus = df[df['수익률'] < 0]
+    df['interval'] = interval
+    df['수익금합계'] = df['수익금'].cumsum()
     df['매수시간'] = df['매수시간'].astype(str)
     df['매도시간'] = df['매도시간'].astype(str)
     df['매수체결가'] = df['매수체결가'].astype(str)
@@ -233,8 +237,17 @@ def make_back_db(df):
     con.commit()
     con.close()
     return df_result
+
+def make_vc_db(df_result,ticker):
+    dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
+    result = pd.DataFrame(df_result, index=[dt_now])
+    back_grid_con = sqlite3.connect(back_vc_file)
+    result.to_sql('coins_vj_' + ticker + '_grid', back_grid_con, if_exists='append')
+    back_grid_con.commit()
+    back_grid_con.close()
+
 def make_detail_db(df,ticker):
-    con = sqlite3.connect(db_path+'upbit_back_grid_detail.db')
+    con = sqlite3.connect(back_detail_file)
     df.to_sql(ticker, con, if_exists='replace')
     con.commit()
     con.close()
@@ -245,7 +258,6 @@ def get_ticker_list(cur,interval):
         print('* DB 테이블이 비어있음 - 확인 필요 *')
         quit()
     table_list = np.concatenate(table_list).tolist()  # 모든테이블을 리스트로변환 https://codechacha.com/ko/python-flatten-list/
-    # print(table_list)
     exist_list =[]
 
     # for ticker in table_list:
@@ -325,72 +337,65 @@ def hogaUnitCalc_per(hogaPrice):
     elif (hogaPrice >= 50000) :
         minPrice = 50000
     return minPrice
-# def loss_hogaPriceReturn_per(currentPrice): #퍼센트로 반환
-#     hogaPrice = currentPrice * ((loss_per * 0.01) + 1)
-#     hogaUnit = hogaUnitCalc(hogaPrice)
-#     minPrice = hogaUnitCalc_per(hogaPrice)
-#     while True:
-#         minPrice = (minPrice - hogaUnit)
-#         if minPrice <= hogaPrice:
-#             return round(minPrice, 2)
+
 if __name__ == '__main__':
     db_path = 'D:/db_files/'
     # db_path = ''
-    con = sqlite3.connect(db_path+'upbit.db')
-    cur = con.cursor()
+    get_db = 'upbit.db'
+    back_file = db_path + '/upbit_backtest.db'
+    back_detail_file = db_path + '/upbit_backtest_grid_detail.db'
+    back_vc_file = db_path + '/upbit_backtest_grid_최적화.db'
 
-    # interval = 'minute3'
-    # buy_hoga = -1 #매수호가
-    # sell_hoga = 1 #매도호가
-    # loss_per = -1 #손절
-    # sell_per = 0.7 #매도 수익률
-    # bet = 1000000 #최초 배팅금액
-    # rsi = 30
-    # high_ratio = -0.2
-    # trail = 0.8
-    # bet_muliple = 1.2
-    # signal_buy = 5 #매수신호 시 상한 횟수
-    # signal_sell = 3 #매도신호 시 상한 횟수
+    get_con = sqlite3.connect(db_path+get_db)
+    cur = get_con.cursor()
 
-
-    interval = 'minute3'
     buy_hoga = -1 #매수호가
     sell_hoga = 1 #매도호가
-    sell_per = 0.7 #매도 수익률
+
+    interval = 'minute3'
     bet = 1000000 #최초 배팅금액
-    bet_multiple = [1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,2.1,2.2,2.3,2.4,2.5]
-    rsis = [25,26,27,28,29,30,31,32,33,34,35]
-    high_ratios = [-0.25,-0.24,-0.23,-0.22,-0.21,-0.2,-0.19,-0.18,-0.17,-0.16,-0.15]
-    trailings = [0.90,0.95,0.85,0.80,0.75,0.70]
     signal_buy = 5 #매수신호 시 상한 횟수
     signal_sell = 3 #매도신호 시 상한 횟수
     money_division = 100
-
-
-
     fee_buy = 0.05 # %
     fee_sell = 0.05 # %
-    # tickers = get_ticker_list(cur,interval)
+
+    optimization = None
+
+    if optimization == True:
+        bet_multiple = [1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,2.1,2.2,2.3,2.4,2.5]
+        rsis = [25,26,27,28,29,30,31,32,33,34,35]
+        high_ratios = [-0.25,-0.24,-0.23,-0.22,-0.21,-0.20,-0.19,-0.18,-0.17,-0.16,-0.15]
+        trailings = [0.90,0.95,0.85,0.80,0.75,0.70]
+        sell_pers = [0.7,0.8,0.9,1.0] #매도 수익률
+    else:
+        bet_multiple = [1.2]
+        rsis = [28]
+        high_ratios = [-0.18]
+        trailings = [0.8]
+        sell_pers = [0.7] #매도 수익률
+
+
     df_amount = pd.DataFrame()
     table_list= get_ticker_list(cur,interval)
     print(table_list)
     # tickers =['AVAX-'+interval,'ALGO-'+interval,'GLM-'+interval,'SRM-'+interval,'TON-'+interval,'BAT-'+interval]
     for ticker in table_list:
         start = time.time()
-        df = pd.read_sql(f"SELECT * FROM '{ticker}'", con).set_index('index')
-        df = df.iloc[:]
+        df = pd.read_sql(f"SELECT * FROM '{ticker}'", get_con).set_index('index')
+        get_con.close()
+        df = df.iloc[5:]
         for bet_m in bet_multiple:
-            for rsi in rsis:
-                for high_ratio in high_ratios:
-                    for trail in trailings:
-                        result = df_back(df,ticker)
-                        dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
-                        result = pd.DataFrame(result,index=[dt_now])
-                        back_grid_con = sqlite3.connect(db_path + 'upbit_back.db')
-                        result.to_sql(ticker+'backteset_grid',back_grid_con,if_exists='append')
-                        back_grid_con.commit()
-                        back_grid_con.close()
+            for sell_per in sell_pers:
+                for rsi in rsis:
+                    for high_ratio in high_ratios:
+                        for trail in trailings:
+                            df,df_result = df_backtest(df,ticker)
+                            make_detail_db(df,ticker)
+                            make_back_db(df)
+                            if optimization == True:
+                                make_vc_db(df_result,ticker)
 
-    con.close()
+
     # df_result = make_back_db(df_amount)
     # print(df_result)
