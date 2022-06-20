@@ -219,9 +219,23 @@ def order_sell(df,ticker,order_type):
         df.loc[df.index[-1], '현재가'] = close
         df.loc[df.index[-1], '매도호가'] = sell_price
         df.loc[df.index[-1], 'uuid'] = uuid
-        print(f'매도주문 -> [현재가{close}, '
+        print(f'시장가매도주문 -> [현재가{close}, '
               f'매도호가: {sell_hoga}, 매도가: {sell_price}, 매도수량: {volume}], 매도금액{round(sell_price*volume)}')
         print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - 매도 ',end=', ')
+
+        amount = df.loc[df.index[-1], '총매수']
+        sell_price = df.loc[df.index[-1], '매도호가']
+        volume = df.loc[df.index[-1], '보유수량']
+        evalue = round(sell_price * volume)
+        df.loc[df.index[-1], '총평가'] = evalue
+        df.loc[df.index[-1], '보유여부'] = False
+        df.loc[df.index[-1], '보유수량'] = 0
+        df.loc[df.index[-1], '총매수'] = 0
+        df.loc[df.index[-1], '매수횟수'] = 0
+        df.loc[df.index[-1], '최고수익률'] = 0
+        df.loc[df.index[-1], '평가손익'] = evalue - amount
+        df.loc[df.index[-1], '매도시간'] = int(datetime.datetime.now().strftime("%Y%m%d%H%M"))
+        df.loc[df.index[-1], 'uuid'] = 'empty'
     return df
 
 def check_order(df,ticker,uuid):
