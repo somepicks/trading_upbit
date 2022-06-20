@@ -71,6 +71,7 @@ def df_backtest(df,ticker):
     df['매도호가'] = np.nan
     df['매도체결가'] = np.nan
     df['매수그룹'] = np.nan
+    df['매도그룹'] = np.nan
     df['매수횟수'] = np.nan
     df['보유여부'] = np.nan
     df['보유현금'] = bet
@@ -84,8 +85,8 @@ def df_backtest(df,ticker):
     df['평가손익'] = float(0)
     df['수수료'] = int(0)
     df['매수시간'] = int(0)
-    df['매도시간'] = int(0)
-    df['보유시간'] = int(0)
+    df['매도시간'] = np.nan
+    df['보유시간'] = np.nan
 
     length = len(df.index)
     ing_before=0
@@ -178,6 +179,8 @@ def df_backtest(df,ticker):
     if not np.isnan(df.loc[df.index[-1],'매수금액']):         #마지막행 보유 시 일괄 매도
         commission_sell = round(df.loc[df.index[-1],'총평가']*fee_sell*0.01)
         wallet = df.loc[df.index[-1],'보유현금'] + df.loc[df.index[-1],'총평가']-commission_sell
+        df.loc[df.index[-1],'매도시간'] = df.index[-1]
+        df.loc[df.index[-1],'보유여부'] = False
 
     benefit =  wallet - bet
     ror = round(benefit/bet*100,2)
@@ -191,30 +194,29 @@ def df_backtest(df,ticker):
     origin_ror = round((origin_close-origin_open)/origin_open*100,2)
     max_bet = round(df['총매수'].max(),2)
     max_buy = round(df['매수횟수'].max(),2)
-    print(f'배팅배수: {bet_m}, rsi: {rsi}, 고저대비: {high_ratio}, 트레일링스탑: {trail}, 수익률: {ror}, 수익금: {benefit}, 수수료: {commission}, 매수신호횟수: {signal},매수체결횟수:{che}, 매수최고금액: {max_bet}, 최대매수횟수: {max_buy}최고수익률: {maximum}, 최저수익률: {minimum}, 단순보유수익률: {origin_ror} ')
-    df_result = {'배팅배수':[bet_m],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수신호횟수':[signal],'매수체결횟수':[che],'매수최고금액':[max_bet],'최대매수횟수':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
-
-    return df,df_result
-def make_back_db(df):
-    con = sqlite3.connect(back_file)
+    print(f'배팅배수: {bet_m}, rsi: {rsi}, 고저대비: {high_ratio}, 트레일링스탑: {trail},최소마진{sell_per}, 수익률: {ror}, 수익금: {benefit}, 수수료: {commission}, 매수신호횟수: {signal},매수체결횟수:{che}, 매수최고금액: {max_bet}, 최대매수횟수: {max_buy}최고수익률: {maximum}, 최저수익률: {minimum}, 단순보유수익률: {origin_ror} ')
+    dict_result = {'배팅배수':[bet_m],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'최소마진':[sell_per],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수신호횟수':[signal],'매수체결횟수':[che],'매수최고금액':[max_bet],'최대매수횟수':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
     dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
+    df_result = pd.DataFrame(dict_result, index=[dt_now])
+    return df,df_result
+
+def make_back_db(df,df_result,ticker):
     # dt_now = 'coins_vj_'+ dt_now[0:16]
     # table = 'coins_vj_'+ dt_now
-    df.dropna(subset=['보유여부'],axis=0,inplace=True)
-    print(df)
-    ror = df['수익률'].mean()
-    benefit = df['수익금'].sum()
-    plus = df[df['수익률'] > 0]
-    minus = df[df['수익률'] < 0]
+    df.dropna(subset=['보유여부'],axis=0,inplace=True) #보유여부가 nan인 행을 찾아 삭제
+    df['매도시간'].fillna(method='bfill',inplace=True)
+    df.drop(df[df['보유여부']==False].index,inplace=True) #보유여부가 False인 행을 찾아서 삭제
+    # df.loc[df.매도시간==0,'매도시간']=pd.Series(df.index,index=df.index)
+    # print(df.dtypes)
+    # df['매도시간']=df['매도시간'].astype(int)
     df['interval'] = interval
-    df['수익금합계'] = df['수익금'].cumsum()
     df['매수시간'] = df['매수시간'].astype(str)
-    df['매도시간'] = df['매도시간'].astype(str)
+    df['매도시간'] = df['매도시간'].astype(str).str[0:14]
     df['매수체결가'] = df['매수체결가'].astype(str)
     df['매도체결가'] = df['매도체결가'].astype(str)
     df['수익률'] = df['수익률'].astype(str)
-    df.rename(columns={'매수체결가': '매수가'}, inplace=True)
-    df.rename(columns={'매도체결가': '매도가'}, inplace=True)
+    # df.rename(columns={'매수체결가': '매수가'}, inplace=True)
+    # df.rename(columns={'매도체결가': '매도가'}, inplace=True)
     df['매수시간_dt'] = pd.to_datetime(df['매수시간'], format='%Y%m%d%H%M%S') #int형을 datetime으로 변환
     df['매도시간_dt'] = pd.to_datetime(df['매도시간'], format='%Y%m%d%H%M%S') #int형을 datetime으로 변환
     df['보유시간']=df['매도시간_dt']-df['매수시간_dt']
@@ -223,26 +225,27 @@ def make_back_db(df):
     df['매도시간_dt']=df['매도시간_dt'].astype(str)
     df['보유시간']=df['보유시간'].astype(str)
     # df = df[df.duplicated(subset=['매수시간', '매도시간'], keep=False)]
+    con = sqlite3.connect(back_file)
+    dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
+    df.to_sql(dt_now+'_'+ticker, con, if_exists='replace')
 
-    df.to_sql(table, con, if_exists='replace')
     # group = df.groupby(df.index)
     # print(group.size().max())
-    plus_per = len(plus)/len(df.index)*100
-    result = {'interval':interval,'거래횟수': len(df.index),'평균수익률': round(ror,2),'익절': len(plus),
-              '손절': len(minus), '승률': round(plus_per,1),'수익금합계': benefit,'평균보유기간': str(had_time)[:15],
-              '배팅금액': bet,'수익률합계': 0, '최대낙폭률': 0,'필요자금': 0, '일평균거래횟수': 0,
-              '최대보유종목수': 0,'매수전략':'기술적 매수','매도전략':'예술적 매도'}
-    df_result = pd.DataFrame(result, index=[dt_now])
-    df_result.to_sql('coins_vj', con, if_exists='append')
+    # plus_per = len(plus)/len(df.index)*100
+    # result = {'interval':interval,'거래횟수': len(df.index),'평균수익률': round(ror,2),'익절': len(plus),
+    #           '손절': len(minus), '승률': round(plus_per,1),'수익금합계': benefit,'평균보유기간': str(had_time)[:15],
+    #           '배팅금액': bet,'수익률합계': 0, '최대낙폭률': 0,'필요자금': 0, '일평균거래횟수': 0,
+    #           '최대보유종목수': 0,'매수전략':'기술적 매수','매도전략':'예술적 매도'}
+    # df_result = pd.DataFrame(result, index=[dt_now])
+    # df_result.to_sql('coins_vj', con, if_exists='append')
     con.commit()
     con.close()
     return df_result
 
 def make_vc_db(df_result,ticker):
-    dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
-    result = pd.DataFrame(df_result, index=[dt_now])
+    df_result.rename(index={df_result.index[0]:index_num},inplace=True) #인덱스 이름 바꾸기
     back_grid_con = sqlite3.connect(back_vc_file)
-    result.to_sql('coins_vj_' + ticker + '_grid', back_grid_con, if_exists='append')
+    df_result.to_sql('coins_vc_' + ticker + '_grid2', back_grid_con, if_exists='append')
     back_grid_con.commit()
     back_grid_con.close()
 
@@ -251,6 +254,7 @@ def make_detail_db(df,ticker):
     df.to_sql(ticker, con, if_exists='replace')
     con.commit()
     con.close()
+
 def get_ticker_list(cur,interval):
     cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
     table_list = cur.fetchall()  # fetchall 한번에 모든 로우 데이터 읽기 (종목코드 읽기)
@@ -265,8 +269,8 @@ def get_ticker_list(cur,interval):
     #     if str(ticker[position:]) == interval:
     #         exist_list.append(ticker)
     [exist_list.append(x) for x in table_list if str(x[x.find('-')+1:]) == interval] #for문을 컴프리헨션으로
-
     return exist_list
+
 def hogaUnitCalc(price):
     hogaUnit = 1
     if price < 10:
@@ -345,6 +349,7 @@ if __name__ == '__main__':
     back_file = db_path + '/upbit_backtest.db'
     back_detail_file = db_path + '/upbit_backtest_grid_detail.db'
     back_vc_file = db_path + '/upbit_backtest_grid_최적화.db'
+    index_num = 0
 
     get_con = sqlite3.connect(db_path+get_db)
     cur = get_con.cursor()
@@ -360,13 +365,13 @@ if __name__ == '__main__':
     fee_buy = 0.05 # %
     fee_sell = 0.05 # %
 
-    optimization = None
+    optimization = True
 
     if optimization == True:
-        bet_multiple = [1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,2.1,2.2,2.3,2.4,2.5]
-        rsis = [25,26,27,28,29,30,31,32,33,34,35]
-        high_ratios = [-0.25,-0.24,-0.23,-0.22,-0.21,-0.20,-0.19,-0.18,-0.17,-0.16,-0.15]
-        trailings = [0.90,0.95,0.85,0.80,0.75,0.70]
+        bet_multiple = [1.2]
+        rsis = [34,35]
+        high_ratios = [-0.15]
+        trailings = [0.70]
         sell_pers = [0.7,0.8,0.9,1.0] #매도 수익률
     else:
         bet_multiple = [1.2]
@@ -390,12 +395,13 @@ if __name__ == '__main__':
                 for rsi in rsis:
                     for high_ratio in high_ratios:
                         for trail in trailings:
-                            df,df_result = df_backtest(df,ticker)
-                            make_detail_db(df,ticker)
-                            make_back_db(df)
+                            df_back,df_result = df_backtest(df,ticker)
                             if optimization == True:
                                 make_vc_db(df_result,ticker)
-
+                                index_num = index_num+1
+                            elif optimization == False:
+                                make_back_db(df_back, df_result, ticker)
+                                make_detail_db(df_back,ticker)
 
     # df_result = make_back_db(df_amount)
     # print(df_result)

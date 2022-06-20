@@ -11,6 +11,7 @@ import numpy as np
 import sqlite3
 import hoga
 import os
+import math
 
 def run():
     con = sqlite3.connect(db_path)
@@ -59,7 +60,6 @@ def make_df(ticker,df,df_add):
         df.loc[df.index[-1], '수수료'] = df.loc[df.index[-2], '수수료']
         df.loc[df.index[-1], '매수횟수'] = df.loc[df.index[-2], '매수횟수']
         df.loc[df.index[-1], '수익률'] = df.loc[df.index[-2], '수익률']
-
         df.loc[df.index[-1], '최고수익률'] = df.loc[df.index[-2], '최고수익률']
 
         df = stg(df)
@@ -67,20 +67,21 @@ def make_df(ticker,df,df_add):
         uuid = df.loc[df.index[-1], 'uuid']
         loss_cut = df.loc[df.index[-1], '손절신호']
         had = df.loc[df.index[-1], '보유여부']
-        print(f'{datetime.datetime.now().strftime("%m.%d %H:%M:%S")} {ticker} - (인덱스 생성 {i+1} of {add_lenth}) ',end=' | ')
+        print(f'{datetime.datetime.now().strftime("%m.%d %H:%M:%S")} {ticker}-인덱스 생성 {i+1} of {add_lenth}',end=' | ')
 
         if uuid =='empty': # 기존 주문 없음
             if signal == True or signal > 0: #매수신호 발생
-                print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - ',end=', ')
+                # print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - ',end=', ')
                 df=order_buy(df,ticker)
             elif signal == False or signal < 0 : #매도신호 발생
-                print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - ',end=', ')
+                # print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - ',end=', ')
                 if had == True:
-                    df=order_sell(df,ticker)
+                    order_type = 'limit'
+                    df=order_sell(df,ticker,order_type)
                 else:
                     print('매도신호에러 (보유하지 않음)')
             elif np.isnan(signal): # 신호 없음
-                print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - 신호 없음',end=', ')
+                print(f'신호 없음',end='')
             else :
                 print('신호 없음')
         elif uuid != 'empty' and str == type(uuid):  # 기존 주문 있음
@@ -95,10 +96,15 @@ def make_df(ticker,df,df_add):
             총매수 = int(df.loc[df.index[-1], '총매수'])
             매수횟수 = int(df.loc[df.index[-1], '매수횟수'])
             수익률 = round(df.loc[df.index[-1], '수익률'],2)
+            최고수익률 = df.loc[df.index[-1], '최고수익률']
             평가손익 = int(df.loc[df.index[-1], '평가손익'])
-            print(f'매수금액: {총매수}, 매수횟수: {매수횟수}, 수익률: {수익률}, 평가손익: {평가손익}')
+            print(f'총매수: {총매수}, 매수횟수: {매수횟수}, 수익률: {수익률}, 최고수익률: {최고수익률}, 평가손익: {평가손익}',end='')
         else:
-            print('보유 없음')
+            print(f'보유 없음',end='')
+
+        고저 = df.loc[df.index[-1], '고저평균대비등락율']
+        알에스아이 = df.loc[df.index[-1], 'rsi']
+        print(f', RSI: {알에스아이}, 고저: {고저}')
 
     df_add = df[-add_lenth:] #입력받은 df_add만 계산 후 다시 반환
     return df_add
@@ -110,27 +116,38 @@ def stg(df):
     df['rsi'] = round(ta.RSI(df['close'], timeperiod=14))
     df['고저평균대비등락율'] = ((df['close'] / ((df['high'] + df['low']) / 2) - 1) * 100).round(2)
     if df.loc[df.index[-1], '매수횟수'] == 0:
-        df.loc[(df.rsi < 30) & (df.고저평균대비등락율 <= -0.2), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > 0.7) & (df.수익률 > df.최고수익률*0.8),'매매신호'] = False  # 매도 신호
-        # df.loc[(df.수익률 > 0.7),'매매신호'] = False  # 매도 신호
-        df.loc[(df.수익률 < -80 ), '손절신호'] = True  # 손절 신호
+        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
+        df.loc[(df.수익률 > sell_per) & (df.수익률 > df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
     elif df.loc[df.index[-1], '매수횟수'] == 1:
-        df.loc[(df.rsi < 30) & (df.고저평균대비등락율 <= -0.2) & (df.수익률 < -0.2), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > 0.7) & (df.수익률 < df.최고수익률*0.8),'매매신호'] = False  # 매도 신호
+        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
+        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
     elif df.loc[df.index[-1], '매수횟수'] == 2:
-        df.loc[(df.rsi < 30) & (df.고저평균대비등락율 <= -0.2) & (df.수익률 < -0.5), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > 0.7) & (df.수익률 < df.최고수익률*0.8),'매매신호'] = False  # 매도 신호
-        # df.loc[(df.수익률 > 0.7),'매매신호'] = False  # 매도 신호
+        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
+        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
     elif df.loc[df.index[-1], '매수횟수'] == 3:
-        df.loc[(df.rsi < 30) & (df.고저평균대비등락율 <= -0.2) & (df.수익률 < -1), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > 0.7) & (df.수익률 < df.최고수익률*0.8),'매매신호'] = False  # 매도 신호
-        # df.loc[(df.수익률 > 0.7),'매매신호'] = False  # 매도 신호
+        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
+        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
     elif df.loc[df.index[-1], '매수횟수'] == 4:
-        df.loc[(df.rsi < 30) & (df.고저평균대비등락율 <= -0.2) & (df.수익률 < -2), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > 0.7) & (df.수익률 < df.최고수익률*0.8),'매매신호'] = False  # 매도 신호
-        # df.loc[(df.수익률 > 0.7),'매매신호'] = False  # 매도 신호
-    elif df.loc[df.index[-1], '매수횟수'] > 5:
-        pass
+        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
+        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
+    elif df.loc[df.index[-1], '매수횟수'] == 5:
+        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
+        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
+    elif df.loc[df.index[-1], '매수횟수'] == 6:
+        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
+        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
+    elif df.loc[df.index[-1], '매수횟수'] == 7:
+        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
+        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
+    elif df.loc[df.index[-1], '매수횟수'] == 8:
+        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
+        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
+    elif df.loc[df.index[-1], '매수횟수'] == 9:
+        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
+        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
+    else:
+        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
+        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
     return df
 
 def order_buy(df,ticker):
@@ -138,11 +155,11 @@ def order_buy(df,ticker):
     df_evalue = evaluated()
     wallet = df_evalue.loc[df_evalue.index[-1], '보유현금']
     if buy_count == False: #처음 매수 시
-        print('처음매수')
+        print('처음매수신호 발생',end='')
         bet = wallet/money_division
     elif buy_count > 0:
-        print(f'{buy_count+1}회 물타기',end=' ')
-        bet = df.loc[df.index[-1], '매수금액'] * 1.5
+        print(f'{buy_count+1}회 물타기')
+        bet = df.loc[df.index[-1], '매수금액'] * bet_multiple
     else:
         print('매수 에러')
         return df
@@ -171,7 +188,7 @@ def order_buy(df,ticker):
     order_b = upbit.buy_limit_order('KRW-'+ticker, buy_price, volume)  # 500원에 리플20개 매수
     uuid = order_b['uuid']
     print(f'매수주문 -> [현재가: {close}, '
-          f'매수호가{buy_hoga}, 매수가: {buy_price}, 매수수량: {volume}], 매수금액{round(buy_price * volume)}\n{uuid}')
+          f'매수호가{buy_hoga}, 매수가: {buy_price}, 매수수량: {volume}], 매수금액{round(buy_price * volume)}', end='')
     df.loc[df.index[-1], '현재가'] = close
     df.loc[df.index[-1], '매수호가'] = buy_price
     df.loc[df.index[-1], '매수금액'] = round(float(order_b['locked'])) #주문과 동시에 체결되면 에러날 수 있을 것 같음
@@ -180,18 +197,31 @@ def order_buy(df,ticker):
     return df
 
 
-def order_sell(df,ticker):
-    volume = df.loc[df.index[-1], '보유수량']
-    close = pyupbit.get_current_price('KRW-'+ticker)
-    sell_price = hoga.hogaPriceReturn(close,sell_hoga,'업비트')
-    order_s=upbit.sell_limit_order('KRW-'+ticker, sell_price, volume)  # 500원에 리플20개 매도
-    uuid = order_s['uuid']
-    df.loc[df.index[-1], '현재가'] = close
-    df.loc[df.index[-1], '매도호가'] = sell_price
-    df.loc[df.index[-1], 'uuid'] = uuid
-    print(f'매도주문 -> [현재가{close}, '
-          f'매도호가: {sell_hoga}, 매도가: {sell_price}, 매도수량: {volume}], 매도금액{round(sell_price*volume)}\n{uuid}')
-    print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - 매도 ',end=', ')
+def order_sell(df,ticker,order_type):
+    if order_type == 'limit':
+        volume = df.loc[df.index[-1], '보유수량']
+        close = pyupbit.get_current_price('KRW-'+ticker)
+        sell_price = hoga.hogaPriceReturn(close,sell_hoga,'업비트')
+        order_s=upbit.sell_limit_order('KRW-'+ticker, sell_price, volume)  # 500원에 리플20개 매도
+        uuid = order_s['uuid']
+        df.loc[df.index[-1], '현재가'] = close
+        df.loc[df.index[-1], '매도호가'] = sell_price
+        df.loc[df.index[-1], 'uuid'] = uuid
+        print(f'매도주문 -> [현재가{close}, '
+              f'매도호가: {sell_hoga}, 매도가: {sell_price}, 매도수량: {volume}], 매도금액{round(sell_price*volume)}')
+        print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - 매도 ',end=', ')
+    elif order_type == 'market':
+        volume = df.loc[df.index[-1], '보유수량']
+        close = pyupbit.get_current_price('KRW-'+ticker)
+        sell_price = hoga.hogaPriceReturn(close,sell_hoga,'업비트')
+        order_s=upbit.sell_market_order('KRW-'+ticker, volume)  # 시장가 매도
+        uuid = order_s['uuid']
+        df.loc[df.index[-1], '현재가'] = close
+        df.loc[df.index[-1], '매도호가'] = sell_price
+        df.loc[df.index[-1], 'uuid'] = uuid
+        print(f'매도주문 -> [현재가{close}, '
+              f'매도호가: {sell_hoga}, 매도가: {sell_price}, 매도수량: {volume}], 매도금액{round(sell_price*volume)}')
+        print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - 매도 ',end=', ')
     return df
 
 def check_order(df,ticker,uuid):
@@ -199,25 +229,29 @@ def check_order(df,ticker,uuid):
     # print(my_order)
     if my_order['state'] == 'done':  # 주문 체결 시
         if my_order['side'] == 'bid':  # 매수 완료
-            print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - 매수체결 | ', my_order)
+            executed_volume = float(my_order['volume'])
+            paid_fee = math.ceil(float(my_order['paid_fee']))
+            funds = math.ceil(float(my_order['trades'][0]['funds']))
+            print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - 매수체결 | ', my_order['uuid'],
+                  ', 체결수량: ',executed_volume,' 매수금액: ',funds)
             df.loc[df.index[-1], '보유여부'] = True
             df.loc[df.index[-1], '매수시간'] = int(datetime.datetime.now().strftime("%Y%m%d%H%M"))
             df.loc[df.index[-1], 'uuid'] = 'empty'
-            df.loc[df.index[-1], '총매수'] = df.loc[df.index[-1], '총매수'] + round(float(my_order['trades'][0]['funds']))
-            df.loc[df.index[-1], '보유수량'] = df.loc[df.index[-1], '보유수량'] + float(my_order['volume'])
-            df.loc[df.index[-1], '수수료'] = df.loc[df.index[-1], '수수료'] + round(float(my_order['paid_fee']))
+            df.loc[df.index[-1], '총매수'] = df.loc[df.index[-1], '총매수'] + funds
+            df.loc[df.index[-1], '보유수량'] = df.loc[df.index[-1], '보유수량'] + executed_volume
+            df.loc[df.index[-1], '수수료'] = df.loc[df.index[-1], '수수료'] + paid_fee
             df.loc[df.index[-1], '매수횟수'] = df.loc[df.index[-1], '매수횟수'] + 1
         elif my_order['side'] == 'ask':  # 매도 완료
-            print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - 매도체결 | ', my_order)
+            print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - 매도체결 | ', my_order['uuid'])
             amount = df.loc[df.index[-1], '총매수']
             sell_price = df.loc[df.index[-1], '매도호가']
             volume = df.loc[df.index[-1], '보유수량']
             evalue = round(sell_price * volume)
             df.loc[df.index[-1], '총평가'] = evalue
-            sell_fee = round(float(my_order['paid_fee']))
+            paid_fee = math.ceil(float(my_order['paid_fee']))
             df.loc[df.index[-1], '수익률'] = round((evalue - amount) / amount, 3) * 100 - 0.05
-            df.loc[df.index[-1], '평가손익'] = round(evalue - amount - sell_fee)
-            df.loc[df.index[-1], '수수료'] = df.loc[df.index[-1], '수수료'] + sell_fee
+            df.loc[df.index[-1], '평가손익'] = round(evalue - amount - paid_fee)
+            df.loc[df.index[-1], '수수료'] = df.loc[df.index[-1], '수수료'] + paid_fee
             df.loc[df.index[-1], '보유여부'] = False
             df.loc[df.index[-1], '보유수량'] = 0
             df.loc[df.index[-1], '총매수'] = 0
@@ -230,38 +264,68 @@ def check_order(df,ticker,uuid):
     elif my_order['state'] == 'wait':  # 주문 미 체결 시
         # 중복주문 확인
         if my_order['side'] == 'bid' and df.loc[df.index[-1], '매매신호'] == True: #미체결 매수 - 현재 매수
+            if my_order['volume'] != my_order['remaining_volume']:  # 일부 체결 시
+                partial_buy(df,my_order)
             print(f'{ticker} - 매수취소: 중복 추가 매수신호 발생 |',upbit.cancel_order(uuid))
             df.loc[df.index[-1], 'uuid'] = 'empty'
             order_buy(df,ticker)
-        elif my_order['side'] == 'bid' and df.loc[df.index[-1], '매매신호'] == False: #미체결 매수 - 현재 매도
+        elif my_order['side'] == 'bid'  and df.loc[df.index[-1], '매매신호'] == False: #미체결 매수 - 현재 매도
+            if my_order['volume'] != my_order['remaining_volume']:  # 일부 체결 시
+                partial_buy(df,my_order)
             print(f'{ticker} - 매수취소: 매도신호 발생 |',upbit.cancel_order(uuid))
             df.loc[df.index[-1], 'uuid'] = 'empty'
-        elif my_order['side'] == 'ask' and df.loc[df.index[-1], '매매신호'] == True: #미체결 매도 - 현재 매수
-            print(f'{ticker} - 매도취소: 매도신호 발생 |',upbit.cancel_order(uuid))
-            df.loc[df.index[-1], 'uuid'] = 'empty'
-        elif my_order['side'] == 'ask' and df.loc[df.index[-1], '매매신호'] == False: #미체결 매도 - 현재 매도
-            print(f'{ticker} - 매도취소: 중복 추가 매도신호 발생 |',upbit.cancel_order(uuid))
-            df.loc[df.index[-1], 'uuid'] = 'empty'
-            order_sell(df,ticker)
-        elif my_order['side'] == 'bid' and my_order['state'] == 'wait':  # 매수 미 체결 시
+        elif my_order['side'] == 'bid':  # 매수 미 체결 시
             df.loc[df.index[-1], '매매신호'] = df.loc[df.index[-2], '매매신호'] + 1
             signal_num =df.loc[df.index[-1], '매매신호']
             print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - 매수 미체결 {signal_num}회 동안 매수하지 못 함 |')
             if df.loc[df.index[-1], '매매신호'] == buy_limit:  # 매수호가 buy_limit 횟수만큼 안될 시 매수 취소
+                if my_order['volume'] != my_order['remaining_volume']:  # 일부 체결 시
+                    partial_buy(df, my_order)
                 print(f'{ticker} - 매수취소: {buy_limit}회 동안 매수하지 못 함 |',upbit.cancel_order(uuid))
                 df.loc[df.index[-1], 'uuid'] = 'empty'
                 df.loc[df.index[-1], '매수금액'] = df.loc[df.index[-buy_limit], '매수금액']
-        elif my_order['side'] == 'ask' and my_order['state'] == 'wait':  # 매도 미 체결 시
+        elif my_order['side'] == 'ask'  and df.loc[df.index[-1], '매매신호'] == True: #미체결 매도 - 현재 매수
+            if my_order['volume'] != my_order['remaining_volume']:  # 일부 체결 시
+                partial_sell(df,my_order)
+            print(f'{ticker} - 매도취소: 매수신호 발생 |',upbit.cancel_order(uuid))
+            df.loc[df.index[-1], 'uuid'] = 'empty'
+        elif my_order['side'] == 'ask'  and df.loc[df.index[-1], '매매신호'] == False: #미체결 매도 - 현재 매도
+            if my_order['volume'] != my_order['remaining_volume']:  # 일부 체결 시
+                partial_sell(df,my_order)
             df.loc[df.index[-1], '매매신호'] = df.loc[df.index[-2], '매매신호'] - 1
-            signal_num =df.loc[df.index[-1], '매매신호']
+            signal_num = df.loc[df.index[-1], '매매신호']
             print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - 매도 미체결 {signal_num}회 동안 매도하지 못 함 |')
+            if df.loc[df.index[-1], '매매신호'] == sell_limit:  # sell_limit 횟수만큼 매도 안될 시 시장가 매도
+                order_type='market'
+                order_sell(df,ticker,order_type)
+        elif my_order['side'] == 'ask':  # 매도 미 체결 시
+            if my_order['volume'] != my_order['remaining_volume']:  # 일부 체결 시
+                partial_sell(df,my_order)
+            print(f'{ticker} - 매도취소: 매도신호 없어짐 |',upbit.cancel_order(uuid))
+            df.loc[df.index[-1], 'uuid'] = 'empty'
+
         elif my_order['state'] == 'cancel':  # 주문 취소 시
             print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - 매도취소(state == cancel)')
             df.loc[df.index[-1], 'uuid'] = 'empty'
             print('체크이상감지')
-
     return df
+def partial_buy(df,my_order):
+    executed_volume = float(my_order['executed_volume'])
+    paid_fee = math.ceil(float(my_order['paid_fee']))
+    funds = math.ceil(float(my_order['trades'][0]['funds']))
+    df.loc[df.index[-1], '총매수'] = df.loc[df.index[-1], '총매수'] + funds
+    df.loc[df.index[-1], '보유수량'] = df.loc[df.index[-1], '보유수량'] + executed_volume
+    df.loc[df.index[-1], '수수료'] = paid_fee
+    print('매수 일부 체결-', my_order['uuid'], '체결수량: ',executed_volume,' 매수금액: ',funds,end='')
 
+def partial_sell(df,my_order):
+    executed_volume = float(my_order['executed_volume'])
+    paid_fee = math.ceil(float(my_order['paid_fee']))
+    funds = math.ceil(float(my_order['trades'][0]['funds']))
+    df.loc[df.index[-1], '총매수'] = df.loc[df.index[-1], '총매수'] - funds
+    df.loc[df.index[-1], '보유수량'] = df.loc[df.index[-1], '보유수량'] - executed_volume
+    df.loc[df.index[-1], '수수료'] = paid_fee
+    print('매도 일부 체결-', my_order['uuid'], '체결수량: ',executed_volume,' 매수금액: ',funds,end='')
 
 def ror(df):
     close = df.loc[df.index[-1], 'close']
@@ -278,30 +342,39 @@ def ror(df):
         df.loc[df.index[-1], '최고수익률'] = df.loc[df.index[-2], '최고수익률']
     return df
 def record_evalue(con):
+    df_evalue = evaluated()
+    df = pd.read_sql(f"SELECT * FROM '잔고조회'", con).set_index('index')
+    # print(df_evalue.index[0],end=' | ')
+    # print(df.index[-1])
     try:
-        df_evalue = evaluated()
-        df = pd.read_sql(f"SELECT * FROM '잔고조회'", con).set_index('index')
-        if df_evalue.index != df.index[-1]:
+        # print(pd.Series(df_evalue.index,index=df_evalue.index))
+        if df_evalue.index[0] != df.index[-1]:
             df_evalue.to_sql('잔고조회', con, if_exists='append')
+        else:
+            pass
     except:
         print('record_evalue() 에러')
 def evaluated():
     # print('잔고확인')
     balances = upbit.get_balances()
-    for i, bal in enumerate(balances):
-        time.sleep(0.2)
-        if bal.get('avg_buy_price') == '0':  # 거래되지않는 화폐 건너뛰기
-            del balances[i]
+    list_del = []
+    try:
+        for bal in balances:
+            # print(bal.get('currency'))
+            if bal.get('avg_buy_price') == '0':  # 거래되지않는 화폐 건너뛰기
+                list_del.append(bal)
+        for bal in list_del:
+            balances.remove(bal)
+    except:
+        print(balances)
     value = 0
-    for i, bal in enumerate(balances):
-        time.sleep(0.2)
+    for bal in balances:
         ticker = bal.get('currency')
         unit = bal.get('unit_currency')
         stock = float(bal.get('balance'))
-        # print(unit+'-'+ticker)
-        if bal.get('avg_buy_price') == '0':  # 거래되지않는 화폐 건너뛰기
-            continue
-        current = pyupbit.get_current_price(unit + '-' + ticker)
+        time.sleep(0.2)
+        current = pyupbit.get_current_price(unit+'-'+ticker)
+        # print(unit+'-'+ticker,end='')
         # print(type(current))
         # print(type(stock))
         value = current * stock + value
@@ -409,13 +482,18 @@ if __name__ == '__main__':
 
     tickers = ['KRW-BTC']
     commission = 0.0005
-    buy_hoga = -2
-    sell_hoga = 2
-    buy_limit = 7 # 횟수동안 미 체결 시 취소
-    sell_limit = 3 # 횟수동안 미 체결 시 취소
+    buy_hoga = -1
+    sell_hoga = 1
+    buy_limit = 5 # 횟수동안 미 체결 시 취소
+    sell_limit = -3 # 횟수동안 미 체결 시 취소
     # divi_m = int(str(interval[6:]))
     df_evalue=init_db() #계산을 위해 초기에만 처음 필요한 데이터
     money_division = 100
+    bet_multiple = 1.2
+    rsi = 35
+    high_ratio = -0.15
+    trailing = 0.7
+    sell_per = 1
     # tickers = pyupbit.get_tickers(fiat='KRW')
 
     while True:
@@ -427,4 +505,5 @@ if __name__ == '__main__':
     #             if now != int(datetime.datetime.now().strftime('%M')): #현재시간과 전 시간이 다르면 탈출 한번만 실행하기위해
     #                 break
         run()
+        # evaluated()
     # make_df()

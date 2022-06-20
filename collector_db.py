@@ -22,12 +22,12 @@ from pprint import pprint
 if __name__ == '__main__':
     # tickers = pyupbit.get_tickers(fiat="KRW")
     # quit()
-    sales_days = 3
+    sales_days = 5
     split = {'day': sales_days, 'minute240': sales_days * 6, 'minute60': sales_days * 24,
                  'minute30': sales_days * 48, 'minute15': sales_days * 96, 'minute10': sales_days * 144,
                  'minute5': sales_days * 288, 'minute3': sales_days * 480, 'minute1': sales_days * 1440}
     intervals = ['minute1','minute3','minute5']
-    tickers = ['KRW-XRP']
+    tickers = ['KRW-BTC']
     for i,ticker in enumerate(tickers):
         for interval in intervals:
             time.sleep(0.1)
