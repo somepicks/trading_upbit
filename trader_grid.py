@@ -12,6 +12,9 @@ import sqlite3
 import hoga
 import os
 import math
+import telegram
+token = "1883109215:AAHM6-d42-oNmdDO6vmT3SWxB0ICH_od86M"
+bot = telegram.Bot(token)
 
 def run():
     con = sqlite3.connect(db_path)
@@ -66,22 +69,24 @@ def make_df(ticker,df,df_add):
         signal = df.loc[df.index[-1], '매매신호']
         uuid = df.loc[df.index[-1], 'uuid']
         loss_cut = df.loc[df.index[-1], '손절신호']
-        had = df.loc[df.index[-1], '보유여부']
-        print(f'{datetime.datetime.now().strftime("%m.%d %H:%M:%S")} {ticker}-인덱스 생성 {i+1} of {add_lenth}',end=' | ')
-
+        now=datetime.datetime.now().strftime("%m.%d %H:%M:%S")
+        print(f'{now} {ticker}-인덱스 생성 {i+1} of {add_lenth}',end=' | ')
         if uuid =='empty': # 기존 주문 없음
             if signal == True or signal > 0: #매수신호 발생
                 # print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - ',end=', ')
                 df=order_buy(df,ticker)
+                bot.sendMessage(chat_id=1644533124, text=f'{now}: 매수신호')
             elif signal == False or signal < 0 : #매도신호 발생
                 # print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - ',end=', ')
-                if had == True:
+                if df.loc[df.index[-1], '보유여부'] == True:
                     order_type = 'limit'
                     df=order_sell(df,ticker,order_type)
+                    bot.sendMessage(chat_id=1644533124, text=f'{now}: 매도신호')
                 else:
                     print('매도신호에러 (보유하지 않음)')
             elif np.isnan(signal): # 신호 없음
-                print(f'신호 없음',end='')
+                print(f'신호없음 | ',end='')
+                bot.sendMessage(chat_id=1644533124, text=f'{now}: 신호없음')
             else :
                 print('신호 없음')
         elif uuid != 'empty' and str == type(uuid):  # 기존 주문 있음
@@ -91,7 +96,7 @@ def make_df(ticker,df,df_add):
         else:
             print('* 이상감지_uuid 확인 *')
 
-        if had == True:
+        if df.loc[df.index[-1], '보유여부'] == True:
             ror(df)
             총매수 = int(df.loc[df.index[-1], '총매수'])
             매수횟수 = int(df.loc[df.index[-1], '매수횟수'])
@@ -99,8 +104,9 @@ def make_df(ticker,df,df_add):
             최고수익률 = df.loc[df.index[-1], '최고수익률']
             평가손익 = int(df.loc[df.index[-1], '평가손익'])
             print(f'총매수: {총매수}, 매수횟수: {매수횟수}, 수익률: {수익률}, 최고수익률: {최고수익률}, 평가손익: {평가손익}',end='')
+            bot.sendMessage(chat_id=1644533124, text=f'총매수: {총매수}, 매수횟수: {매수횟수}, 수익률: {수익률}, 최고수익률: {최고수익률}, 평가손익: {평가손익}')
         else:
-            print(f'보유 없음',end='')
+            print(f'보유없음',end='')
 
         고저 = df.loc[df.index[-1], '고저평균대비등락율']
         알에스아이 = df.loc[df.index[-1], 'rsi']
@@ -115,39 +121,11 @@ def stg(df):
     df['ma60'] = round(ta.MA(df['close'], timeperiod=60))
     df['rsi'] = round(ta.RSI(df['close'], timeperiod=14))
     df['고저평균대비등락율'] = ((df['close'] / ((df['high'] + df['low']) / 2) - 1) * 100).round(2)
-    if df.loc[df.index[-1], '매수횟수'] == 0:
-        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > sell_per) & (df.수익률 > df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
-    elif df.loc[df.index[-1], '매수횟수'] == 1:
-        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
-    elif df.loc[df.index[-1], '매수횟수'] == 2:
-        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
-    elif df.loc[df.index[-1], '매수횟수'] == 3:
-        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
-    elif df.loc[df.index[-1], '매수횟수'] == 4:
-        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
-    elif df.loc[df.index[-1], '매수횟수'] == 5:
-        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
-    elif df.loc[df.index[-1], '매수횟수'] == 6:
-        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
-    elif df.loc[df.index[-1], '매수횟수'] == 7:
-        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
-    elif df.loc[df.index[-1], '매수횟수'] == 8:
-        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
-    elif df.loc[df.index[-1], '매수횟수'] == 9:
-        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
-    else:
-        df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
-        df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
+    # if df.loc[df.index[-1], '매수횟수'] == 0:
+    #     df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
+    #     df.loc[(df.수익률 > sell_per) & (df.수익률 > df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
+    df.loc[(df.rsi < rsi) & (df.고저평균대비등락율 <= high_ratio), '매매신호'] = True  # 매수 신호
+    df.loc[(df.수익률 > sell_per) & (df.수익률 < df.최고수익률*trailing),'매매신호'] = False  # 매도 신호
     return df
 
 def order_buy(df,ticker):
@@ -207,7 +185,7 @@ def order_sell(df,ticker,order_type):
         df.loc[df.index[-1], '현재가'] = close
         df.loc[df.index[-1], '매도호가'] = sell_price
         df.loc[df.index[-1], 'uuid'] = uuid
-        print(f'매도주문 -> [현재가{close}, '
+        print(f'매도주문 -> [현재가{close},'
               f'매도호가: {sell_hoga}, 매도가: {sell_price}, 매도수량: {volume}], 매도금액{round(sell_price*volume)}')
         print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - 매도 ',end=', ')
     elif order_type == 'market':
@@ -267,6 +245,7 @@ def check_order(df,ticker,uuid):
             df.loc[df.index[-1], '평가손익'] = round(evalue - amount - paid_fee)
             df.loc[df.index[-1], '수수료'] = df.loc[df.index[-1], '수수료'] + paid_fee
             df.loc[df.index[-1], '보유여부'] = False
+            df.loc[df.index[-1], '매수금액'] = 0
             df.loc[df.index[-1], '보유수량'] = 0
             df.loc[df.index[-1], '총매수'] = 0
             df.loc[df.index[-1], '매수횟수'] = 0

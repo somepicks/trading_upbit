@@ -33,6 +33,7 @@ def sell_stg(df):
     # df.loc[(df.close > df.band_upper) & (df.rsi > 70) ,'매매신호'] = False
     # df.loc[(df.cmo_20 < df.cmo_30) & (df.hmac_5 <= df.hmao_5) ,'매매신호'] = False
     df.loc[(df.hmac_5 <= df.hmao_10) ,'매매신호'] = False
+    df.loc[(df.hmao_10 <= df.band_lower) ,'매매신호'] = False
 
     # df.loc[(df.close < df.band_middle),'매매신호'] = False
     # df.loc[(df['매매신호'].shift(1)==True),'매매신호'] = False
@@ -283,20 +284,27 @@ def loss_hogaPriceReturn_per(currentPrice): #퍼센트로 반환
 
 if __name__ == '__main__':
     db_path = "D:/db_files"
-    stock_tick_file = db_path + '/upbit.db'
+    ohlcv_db = db_path + '/upbit.db'
     back_file = db_path + '/upbit_backtest.db'
     back_detail_file = db_path + '/upbit_backtest_detail.db'
-    coin_con = sqlite3.connect(stock_tick_file)
+    coin_con = sqlite3.connect(ohlcv_db)
     cur = coin_con.cursor()
 
     interval = 'minute3'
-    buy_hoga = -2
-    sell_hoga = 3
-    loss_per = -1
-    sell_per = 0.7
     bet = 10000
+    optimization = True
+    if optimization == True:
+        buy_hoga = -2
+        sell_hoga = 3
+        loss_per = -1
+        sell_per = 0.7
+    else:
+        buy_hoga = -2
+        sell_hoga = 3
+        loss_per = -1
+        sell_per = 0.7
     # tickers = get_ticker_list(cur,interval)
-    tickers =['XRP-'+interval]
+    tickers =['BTC-'+interval]
     # tickers =['AVAX-'+interval,'ALGO-'+interval,'GLM-'+interval,'SRM-'+interval,'TON-'+interval,'BAT-'+interval]
     df_amount = pd.DataFrame()
     for ticker in tickers:

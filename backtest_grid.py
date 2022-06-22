@@ -40,7 +40,7 @@ def sell_stg(df,i):
     # quit()
     # df.loc[(df.close > df.band_upper) & (df.rsi > 70) ,'매매신호'] = False
     # df.loc[(df.cmo_20 < df.cmo_30) & (df.hmac_5 <= df.hmao_5) ,'매매신호'] = False
-    df.loc[(df.매수그룹==i)&(df['수익률']>sell_per) & (df['수익률'] < df['최고수익률'] * trail ) ,'매도신호'] = True
+    df.loc[(df.매수그룹==i)&(df['수익률']>sell_per) & (df['수익률'] < df['최고수익률'] * trail )& (df['hmao_20']<df['band_lower']) ,'매도신호'] = True
 
     # df.loc[(df.close < df.band_middle),'매매신호'] = False
     # df.loc[(df['매매신호'].shift(1)==True),'매매신호'] = False
@@ -63,7 +63,7 @@ def sell_stg(df,i):
     return df
 
 def df_backtest(df,ticker):
-    df = df[['open', 'high', 'low', 'close','rsi', '고저평균대비등락율',]]
+    df = df[['open', 'high', 'low', 'close','rsi', '고저평균대비등락율','hmao_20','hmac_20','band_lower']]
     df['매수신호'] = np.nan
     df['매수호가'] = np.nan
     df['매수체결가'] = np.nan
@@ -225,6 +225,8 @@ def make_back_db(df,df_result,ticker):
     df['매도시간_dt']=df['매도시간_dt'].astype(str)
     df['보유시간']=df['보유시간'].astype(str)
     # df = df[df.duplicated(subset=['매수시간', '매도시간'], keep=False)]
+    print(df)
+    quit()
     con = sqlite3.connect(back_file)
     dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
     df.to_sql(dt_now+'_'+ticker, con, if_exists='replace')
@@ -344,14 +346,14 @@ def hogaUnitCalc_per(hogaPrice):
 
 if __name__ == '__main__':
     db_path = 'D:/db_files/'
-    # db_path = ''
-    get_db = 'upbit.db'
+    stock_tick_file = db_path + '/upbit.db'
+    ohlcv_db = 'upbit.db'
     back_file = db_path + '/upbit_backtest.db'
     back_detail_file = db_path + '/upbit_backtest_grid_detail.db'
     back_vc_file = db_path + '/upbit_backtest_grid_최적화.db'
     index_num = 0
 
-    get_con = sqlite3.connect(db_path+get_db)
+    get_con = sqlite3.connect(db_path+ohlcv_db)
     cur = get_con.cursor()
 
     buy_hoga = -1 #매수호가
@@ -364,8 +366,7 @@ if __name__ == '__main__':
     money_division = 100
     fee_buy = 0.05 # %
     fee_sell = 0.05 # %
-
-    optimization = True
+    optimization = False
 
     if optimization == True:
         bet_multiple = [1.2]
@@ -375,10 +376,10 @@ if __name__ == '__main__':
         sell_pers = [0.7,0.8,0.9,1.0] #매도 수익률
     else:
         bet_multiple = [1.2]
-        rsis = [28]
-        high_ratios = [-0.18]
-        trailings = [0.8]
-        sell_pers = [0.7] #매도 수익률
+        rsis = [35]
+        high_ratios = [-0.15]
+        trailings = [0.7]
+        sell_pers = [1] #매도 수익률
 
 
     df_amount = pd.DataFrame()
@@ -388,8 +389,14 @@ if __name__ == '__main__':
     for ticker in table_list:
         start = time.time()
         df = pd.read_sql(f"SELECT * FROM '{ticker}'", get_con).set_index('index')
+        df['hmao_20']=df['hei_open'].rolling(window=5).mean().round(3)
+        df['hmao_30']=df['hei_open'].rolling(window=10).mean().round(3)
+        df['hmac_20']=df['hei_close'].rolling(window=5).mean().round(3)
+        df['hmac_30']=df['hei_close'].rolling(window=10).mean().round(3)
+        # print(df)
+        # quit()
         get_con.close()
-        df = df.iloc[5:]
+        df = df.iloc[:]
         for bet_m in bet_multiple:
             for sell_per in sell_pers:
                 for rsi in rsis:

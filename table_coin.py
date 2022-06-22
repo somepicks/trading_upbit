@@ -629,7 +629,7 @@ def qtable_moneytop(interval):
         days = list(groups.size().index)
         df = pd.DataFrame(index=exist_list)
         df['종목코드'] = df.index
-        print(df)
+        # print(df)
         # df.columns = days
         for day in days:
             df[day] = day
@@ -1136,9 +1136,11 @@ class Chart(QWidget):
 
         # xticks = [x.timestamp() - 32400 for x in df.index]
         df['index_time'] = pd.to_datetime(df.index, format='%Y%m%d%H%M%S')
+        print(df)
         df = df.astype({'index_time': 'str'})
         df=df.drop_duplicates(['index_time']) #시간이 중복인 행 제거
-        df.loc[df.index, 'index_time'] = df[df.index_time.str[-2:] == '00']   # index_chart의 초가 '00'인 경우만 index_chart컬럼 값 저장
+        df.loc[df.index, 'index_time'] = df[df.index_time.str[-5:-3] == '00']   # index_chart의 초가 '00'인 경우만 index_chart컬럼 값 저장
+        print()
         df = df.astype({'index_time': 'str'}) #'index_time'컬럼을 str로 변환
         df['index_time'] = df['index_time'].str[11:-3]
 
@@ -1222,10 +1224,10 @@ class Chart(QWidget):
 
         # p1_2.plot(x=xValue, y=df['고저평균대비등락율'],pen=(200, 50, 50),fillLevel=int(edit2),brush=(50,50,200,50),name='고저평균대비등락율')
 
-        p1_2.plot(x=xValue, y=df['hmao_5'], pen=(255, 94, 0), name='hmao_5')
-        p1_2.plot(x=xValue, y=df['hmao_10'], pen=(255, 228, 0), name='hmao_10')
-        p1_2.plot(x=xValue, y=df['hmac_5'], pen=(0, 216, 255), name='hmac_5')
-        p1_2.plot(x=xValue, y=df['hmac_10'], pen=(95, 0, 255), name='hmac_10')
+        p1_2.plot(x=xValue, y=df['hmao_20'], pen=(255, 94, 0), name='hmao_20')
+        p1_2.plot(x=xValue, y=df['hmao_30'], pen=(255, 228, 0), name='hmao_30')
+        p1_2.plot(x=xValue, y=df['hmac_20'], pen=(0, 216, 255), name='hmac_20')
+        p1_2.plot(x=xValue, y=df['hmac_30'], pen=(95, 0, 255), name='hmac_30')
         # p1_2.plot(x=xValue, y=df['체결강도평균'],   pen=(204,114, 61), name='체결강도평균')
         # p1_2.plot(x=xValue, y=df['체결강도최고'],   pen=y_dot,         name='체결강도최고')
         # p1_2.plot(x=xValue, y=df['체결강도최저'],   pen=g_dot,         name='체결강도최저')
@@ -1283,10 +1285,10 @@ class Chart(QWidget):
 
         # p1_11.plot(x=xValue, y=df['volume'], pen=(200, 50, 50),name='volume')
 
-        p1_11.plot(x=xValue, y=df['hmao_5'], pen=(255, 94, 0), name='hmao_5')
-        p1_11.plot(x=xValue, y=df['hmao_10'], pen=(255, 228, 0), name='hmao_10')
-        p1_11.plot(x=xValue, y=df['hmac_5'], pen=(0, 216, 255), name='hmac_5')
-        p1_11.plot(x=xValue, y=df['hmac_10'], pen=(95, 0, 255), name='hmac_10')
+        p1_11.plot(x=xValue, y=df['hmao_20'], pen=(255, 94, 0), name='hmao_20')
+        p1_11.plot(x=xValue, y=df['hmao_30'], pen=(255, 228, 0), name='hmao_30')
+        p1_11.plot(x=xValue, y=df['hmac_20'], pen=(0, 216, 255), name='hmac_20')
+        p1_11.plot(x=xValue, y=df['hmac_30'], pen=(95, 0, 255), name='hmac_30')
         # p1_11.plot(x=xValue, y=df['매수잔량1평균'], pen=(242, 203, 95), name='매수잔량1평균')
         # p1_11.plot(x=xValue, y=df['매도잔량1평균'], pen=(92, 210, 229), name='매도잔량1평균')
         # p1_11.plot(x=xValue, y=df['매도잔량1평균최고'], pen=(y_dot), name='매도잔량1평균최고')
@@ -1320,10 +1322,10 @@ class Chart(QWidget):
         # lr.setZValue(-1)
         # p1_1.addItem(lr)
 
-        p2_2.plot(x=xValue, y=df['hmao_5'], pen=(255, 94, 0), name='hmao_5')
-        p2_2.plot(x=xValue, y=df['hmao_10'],pen=(255, 228, 0), name='hmao_10')
-        p2_2.plot(x=xValue, y=df['hmac_5'], pen=(0, 216, 255), name='hmac_5')
-        p2_2.plot(x=xValue, y=df['hmac_10'], pen=(95, 0, 255), name='hmac_10')
+        p2_2.plot(x=xValue, y=df['hmao_20'], pen=(255, 94, 0), name='hmao_20')
+        p2_2.plot(x=xValue, y=df['hmao_30'],pen=(255, 228, 0), name='hmao_30')
+        p2_2.plot(x=xValue, y=df['hmac_20'], pen=(0, 216, 255), name='hmac_20')
+        p2_2.plot(x=xValue, y=df['hmac_30'], pen=(95, 0, 255), name='hmac_30')
         # p2_2.plot(x=xValue, y=df['거래대금평균최고마지'], pen=y_dot, name='거래대금평균최고마지')
         # p2_2.plot(x=xValue, y=df['초대금평균차초대금평균최고'], pen=g_dot, name='초대금평균차초대금평균최고')
         # p2_2.plot(x=xValue, y=df['체결강도평균마지+'], pen=g_dash, name='체결강도평균마지+')
@@ -1435,11 +1437,11 @@ def df_add(df,avg,ch_max):
     df['cmo_20']=df['cmo'].rolling(window=20).mean().round(3)
     df['cmo_30']=df['cmo'].rolling(window=30).mean().round(3)
     df['cmo_60']=df['cmo'].rolling(window=60).mean().round(3)
-    df['hmao_5']=df['hei_open'].rolling(window=5).mean().round(3)
-    df['hmao_10']=df['hei_open'].rolling(window=10).mean().round(3)
-    df['hmac_5']=df['hei_close'].rolling(window=5).mean().round(3)
-    df['hmac_10']=df['hei_close'].rolling(window=10).mean().round(3)
-    df['hma']=df['hmac_5']-df['hmac_10']
+    df['hmao_20']=df['hei_open'].rolling(window=5).mean().round(3)
+    df['hmao_30']=df['hei_open'].rolling(window=10).mean().round(3)
+    df['hmac_20']=df['hei_close'].rolling(window=5).mean().round(3)
+    df['hmac_30']=df['hei_close'].rolling(window=10).mean().round(3)
+    df['hma']=df['hmac_20']-df['hmac_30']
     df['hma최고']=df['hma'].rolling(window=5).max()
     df['hma최저']=df['hma'].rolling(window=5).min()
     df['hma_gap_l'] = df['hma']-df['hma최저']
