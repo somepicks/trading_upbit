@@ -75,18 +75,27 @@ def make_df(ticker,df,df_add):
             if signal == True or signal > 0: #매수신호 발생
                 # print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - ',end=', ')
                 df=order_buy(df,ticker)
-                bot.sendMessage(chat_id=1644533124, text=f'{now}: 매수신호')
+                try:
+                    bot.sendMessage(chat_id=1644533124, text=f'{now}: 매수신호')
+                except:
+                    print('텔레그램 에러')
             elif signal == False or signal < 0 : #매도신호 발생
                 # print(f'{datetime.datetime.now().strftime("%H:%M:%S")} - ',end=', ')
                 if df.loc[df.index[-1], '보유여부'] == True:
                     order_type = 'limit'
                     df=order_sell(df,ticker,order_type)
-                    bot.sendMessage(chat_id=1644533124, text=f'{now}: 매도신호')
+                    try:
+                        bot.sendMessage(chat_id=1644533124, text=f'{now}: 매도신호')
+                    except:
+                        print('텔레그램 에러')
                 else:
                     print('매도신호에러 (보유하지 않음)')
             elif np.isnan(signal): # 신호 없음
                 print(f'신호없음 | ',end='')
-                bot.sendMessage(chat_id=1644533124, text=f'{now}: 신호없음')
+                try:
+                    bot.sendMessage(chat_id=1644533124, text=f'{now}: 신호없음')
+                except:
+                    print('텔레그램 에러')
             else :
                 print('신호 없음')
         elif uuid != 'empty' and str == type(uuid):  # 기존 주문 있음
@@ -101,10 +110,14 @@ def make_df(ticker,df,df_add):
             총매수 = int(df.loc[df.index[-1], '총매수'])
             매수횟수 = int(df.loc[df.index[-1], '매수횟수'])
             수익률 = round(df.loc[df.index[-1], '수익률'],2)
-            최고수익률 = df.loc[df.index[-1], '최고수익률']
+            최고수익률 = round(df.loc[df.index[-1], '최고수익률'],2)
             평가손익 = int(df.loc[df.index[-1], '평가손익'])
-            print(f'총매수: {총매수}, 매수횟수: {매수횟수}, 수익률: {수익률}, 최고수익률: {최고수익률}, 평가손익: {평가손익}',end='')
-            bot.sendMessage(chat_id=1644533124, text=f'총매수: {총매수}, 매수횟수: {매수횟수}, 수익률: {수익률}, 최고수익률: {최고수익률}, 평가손익: {평가손익}')
+            보유수량 = int(df.loc[df.index[-1], '보유수량'])
+            print(f'총매수: {총매수}, 매수횟수: {매수횟수}, 수익률: {수익률}, 최고수익률: {최고수익률}, 평가손익: {평가손익}, 보유수량: {보유수량}',end='')
+            try:
+                bot.sendMessage(chat_id=1644533124, text=f'총매수: {총매수}, 매수횟수: {매수횟수}, 수익률: {수익률}, 최고수익률: {최고수익률}, 평가손익: {평가손익}, 보유수량: {보유수량}')
+            except:
+                print('텔레그램 에러')
         else:
             print(f'보유없음',end='')
 
@@ -335,11 +348,11 @@ def ror(df):
         df.loc[df.index[-1], '최고수익률'] = df.loc[df.index[-2], '최고수익률']
     return df
 def record_evalue(con):
-    df_evalue = evaluated()
-    df = pd.read_sql(f"SELECT * FROM '잔고조회'", con).set_index('index')
-    # print(df_evalue.index[0],end=' | ')
-    # print(df.index[-1])
     try:
+        df_evalue = evaluated()
+        df = pd.read_sql(f"SELECT * FROM '잔고조회'", con).set_index('index')
+        # print(df_evalue.index[0],end=' | ')
+        # print(df.index[-1])
         # print(pd.Series(df_evalue.index,index=df_evalue.index))
         if df_evalue.index[0] != df.index[-1]:
             df_evalue.to_sql('잔고조회', con, if_exists='append')
@@ -483,10 +496,10 @@ if __name__ == '__main__':
     df_evalue=init_db() #계산을 위해 초기에만 처음 필요한 데이터
     money_division = 100
     bet_multiple = 1.2
-    rsi = 35
+    rsi = 40
     high_ratio = -0.15
-    trailing = 0.7
-    sell_per = 1
+    trailing = 0.8
+    sell_per = 1.5
     # tickers = pyupbit.get_tickers(fiat='KRW')
 
     while True:

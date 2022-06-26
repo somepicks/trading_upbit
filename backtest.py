@@ -55,7 +55,7 @@ def losscut_stg(df):
     df.loc[df['보유여부'].shift(1)==False,'매도체결가' ] = np.nan
     df.loc[(df.보유여부==True),'손절가'] = df['매수체결가']-(df['매수체결가']*abs(loss_per)*0.01)
     return df
-def df_back(df,ticker):
+def df_backtest(df,ticker):
     df = df[['open', 'high', 'low', 'close', 'ma20', 'ma60', 'rsi','band_upper','band_lower','band_middle','val_rsi','hei_open','hei_close','고저평균대비등락율','hmac_5','hmac_10','hmao_5','hmao_10','cmo_20','cmo_30','hma_gap_l','hma_gap_h']]
     df = buy_stg(df)
     df = sell_stg(df)
@@ -75,8 +75,6 @@ def df_back(df,ticker):
     df.loc[df['보유여부']==True,'기간수익률'] = round((df['close']-df['매수체결가'])/df['매수체결가']*100,1)
 
     df = losscut_stg(df)
-    make_detail_db(df,ticker)
-    # quit()
     # df.loc[df['기간수익률']<loss_per,'매도체결가'] = df['high']
     df.loc[(df['매도체결가']>0) & (df['보유여부']==False),'수익률'] = round(((df['매도체결가']-df['매수체결가'])/df['매수체결가'].shift(1)*100)-0.1,1)
     df.loc[(df['매도체결가']>0) & (df['보유여부']==False),'수익금'] = round(((df['매도체결가']/df['매수체결가'].shift(1)-0.001)*bet)-bet)
@@ -84,20 +82,20 @@ def df_back(df,ticker):
     df['단순보유수익률'] = round((df['close'] - df.iloc[0, 0])/df.iloc[0, 0]*100,1)
     # df[['수익률', '단순보유수익률']].plot(figsize=(8, 4))
     df['종목명']=str(ticker[:ticker.find('-')])
-    df['index_2']=df.index
-    df.loc[(df.보유여부==True) & (df.보유여부.shift(1)==False & (df.매매신호.shift(1) == True) ),'매수시간']=df['index_2'] #앞의 조건을 만족하면 '매수시간'컬럼에 'index_2'값 입력
-    df.loc[(df.보유여부==False) & (df.보유여부.shift(1) == True),'매도시간']=df['index_2']
-
+    # df['index_2']=df.index
+    # df.loc[(df.보유여부==True) & (df.보유여부.shift(1)==False & (df.매매신호.shift(1) == True) ),'매수시간']=df['index_2'] #앞의 조건을 만족하면 '매수시간'컬럼에 'index_2'값 입력
+    # df.loc[(df.보유여부==False) & (df.보유여부.shift(1) == True),'매도시간']=df['index_2']
+    df.loc[(df.보유여부==True) & (df.보유여부.shift(1)==False & (df.매매신호.shift(1) == True) ),'매수시간']=pd.Series(df.index,index=df.index) #앞의 조건을 만족하면 '매수시간'컬럼에 'index_2'값 입력
+    df.loc[(df.보유여부==False) & (df.보유여부.shift(1) == True),'매도시간']=pd.Series(df.index,index=df.index)
+    # print(df)
     df['매수시간'].fillna(method='ffill', inplace=True)  # nan값을 윗 값으로 채움
     df['매수시간'] = df['매수시간'].fillna(0) #nan값을 다른값으로 대체 후 타입변환 가능
     df['매도시간'] = df['매도시간'].fillna(0)
-    df.loc[df.index[-1],'매도시간'] = df.loc[df.index[-1],'index_2']
+    # print(pd.Series(df.index,index=df.index).index[-1])
+    df.loc[df.index[-1],'매도시간'] = pd.Series(df.index,index=df.index).index[-1] #마지막에 일괄 매도이기 때문에 매도시간 마지막행을 인덱스마지막행으로 변경
     df['매수시간'] = df['매수시간'].astype(np.int64)
     df['매도시간'] = df['매도시간'].astype(np.int64)
-    # print(df)
     make_detail_db(df,ticker)
-    # print(df.dtypes)
-    # quit()
 
     # index_x = df[(df['매수시간'].isnull()) & (df['매도시간'].isnull())].index
     # index_x = df[df['매도시간'].isnull()].index # 매도시간이 비어있는 행을(매수시간행)을 반환
@@ -120,16 +118,12 @@ def df_back(df,ticker):
     print(f' - 수익률: {ror}, 수익금: {rop}')
     return df
 def make_back_db(df):
-    con = sqlite3.connect(back_file)
-    dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
-    # dt_now = 'coins_vj_'+ dt_now[0:16]
-    table = 'coins_vj_'+ dt_now
     ror = df['수익률'].mean()
-    benefit = df['수익금'].sum()
     plus=df[df['수익률'] > 0]
     minus=df[df['수익률'] < 0]
-    df['interval']=interval
+    benefit = df['수익금'].sum()
     df['수익금합계']=df['수익금'].cumsum()
+    df['interval']=interval
     df['매수시간'] = df['매수시간'].astype(str)
     df['매도시간'] = df['매도시간'].astype(str)
     df['매수체결가'] = df['매수체결가'].astype(str)
@@ -138,7 +132,7 @@ def make_back_db(df):
     df.rename(columns={'매수체결가': '매수가'}, inplace=True)
     df.rename(columns={'매도체결가': '매도가'}, inplace=True)
 
-    # print(df.dtypes)
+    print(df)
     df['매수시간_dt'] = pd.to_datetime(df['매수시간'], format='%Y%m%d%H%M%S') #int형을 datetime으로 변환
     df['매도시간_dt'] = pd.to_datetime(df['매도시간'], format='%Y%m%d%H%M%S') #int형을 datetime으로 변환
     df['보유시간']=df['매도시간_dt']-df['매수시간_dt']
@@ -147,7 +141,9 @@ def make_back_db(df):
     df['매도시간_dt']=df['매도시간_dt'].astype(str)
     df['보유시간']=df['보유시간'].astype(str)
     # df = df[df.duplicated(subset=['매수시간', '매도시간'], keep=False)]
-
+    con = sqlite3.connect(back_file)
+    dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
+    table = 'coins_vj_'+ dt_now
     df.to_sql(table, con, if_exists='replace')
     # group = df.groupby(df.index)
     # print(group.size().max())
@@ -309,12 +305,10 @@ if __name__ == '__main__':
     df_amount = pd.DataFrame()
     for ticker in tickers:
         df = pd.read_sql(f"SELECT * FROM '{ticker}'", coin_con).set_index('index')
-
         # df = df.iloc[2490:2520]
         print(ticker,end='')
-        # print(df)
         df = df_add(df)
-        df = df_back(df,ticker)
+        df = df_backtest(df,ticker)
         df_amount = pd.concat([df,df_amount],axis=0)
     coin_con.commit()
     coin_con.close()
