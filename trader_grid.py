@@ -31,24 +31,23 @@ def run():
         time.sleep(0.1)
         df_db = pd.read_sql(f"SELECT * FROM '{ticker}'", con).set_index('index')
         df_add = pyupbit.get_ohlcv('KRW-'+ticker, interval=interval, count=5)
-        if df_add.empty: #서버점검일 경우
-            print('데이터 불러올 수 없음 (서버점검 확인 요망)')
-            time.sleep(60)
-            continue
-        df_add.index = df_add.index.strftime("%Y%m%d%H%M").astype(np.int64)
-        df_add = df_add.drop([df_add.index[-1]]) #마지막 행은 현재 만들어지고 있는거기 때문에 제거
+        try:
+            df_add.index = df_add.index.strftime("%Y%m%d%H%M").astype(np.int64)
+            df_add = df_add.drop([df_add.index[-1]]) #마지막 행은 현재 만들어지고 있는거기 때문에 제거
 
-        list_index = list(set(df_add.index.tolist())-set(df_db.index.tolist())) #새로받은 인덱스랑 기존인덱스 비교
-        if list_index: #차집합으로 인덱스 추가되면
-            # df_sum = pd.concat([df_db,df_add]) #df합치기
-            # duplicateRowsDF = df_sum[df_sum.index.duplicated()] #중복되는인덱스의 데이터 추출
-            # if not df_sum.index.is_unique: #인덱스가 고유하지 않을 경우(중복되는 인덱스가 있을 경우)
-            #     df_add.drop(duplicateRowsDF.index,inplace=True) #중복되는 행의 인덱스 반환 후 삭제
-            #     # df_db = df_db.loc[~df_db.index.duplicated(keep='last')] #인덱스가 중복인 행은 마지막꺼 살리고 제거
-            df_add = df_add[-len(list_index):]
-            df_add = make_df(ticker,df_db,df_add)
-            df_add['now'] = int(datetime.datetime.now().strftime("%Y%m%d%H%M"))
-            df_add.to_sql(ticker, con, if_exists='append')
+            list_index = list(set(df_add.index.tolist())-set(df_db.index.tolist())) #새로받은 인덱스랑 기존인덱스 비교
+            if list_index: #차집합으로 인덱스 추가되면
+                # df_sum = pd.concat([df_db,df_add]) #df합치기
+                # duplicateRowsDF = df_sum[df_sum.index.duplicated()] #중복되는인덱스의 데이터 추출
+                # if not df_sum.index.is_unique: #인덱스가 고유하지 않을 경우(중복되는 인덱스가 있을 경우)
+                #     df_add.drop(duplicateRowsDF.index,inplace=True) #중복되는 행의 인덱스 반환 후 삭제
+                #     # df_db = df_db.loc[~df_db.index.duplicated(keep='last')] #인덱스가 중복인 행은 마지막꺼 살리고 제거
+                df_add = df_add[-len(list_index):]
+                df_add = make_df(ticker,df_db,df_add)
+                df_add['now'] = int(datetime.datetime.now().strftime("%Y%m%d%H%M"))
+                df_add.to_sql(ticker, con, if_exists='append')
+        except:
+            print('데이터 불러올 수 없음 (서버점검검 확인 요망)')
     con.commit()
     con.close()
 def make_df(ticker,df,df_add):
@@ -112,7 +111,7 @@ def make_df(ticker,df,df_add):
             수익률 = round(df.loc[df.index[-1], '수익률'],2)
             최고수익률 = round(df.loc[df.index[-1], '최고수익률'],2)
             평가손익 = int(df.loc[df.index[-1], '평가손익'])
-            보유수량 = int(df.loc[df.index[-1], '보유수량'])
+            보유수량 = round(df.loc[df.index[-1], '보유수량'],8)
             print(f'총매수: {총매수}, 매수횟수: {매수횟수}, 수익률: {수익률}, 최고수익률: {최고수익률}, 평가손익: {평가손익}, 보유수량: {보유수량}',end='')
             try:
                 bot.sendMessage(chat_id=1644533124, text=f'총매수: {총매수}, 매수횟수: {매수횟수}, 수익률: {수익률}, 최고수익률: {최고수익률}, 평가손익: {평가손익}, 보유수량: {보유수량}')

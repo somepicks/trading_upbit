@@ -14,9 +14,13 @@ def buy_stg(df):
     # df.loc[(df.rsi < 30) & (df.ma20 > df.ma60) & (df.low<df.band_lower),'매매신호'] = True
     # df['매매신호'] = True
     df.loc[df.index ,'매매신호'] = True
-    df.loc[(df.hei_close < df.hei_open) & (df.매매신호==True) ,'매매신호'] = np.nan
-    df.loc[((df.hmac_5 - df.hmac_10)<80000) & (df.매매신호==True) ,'매매신호'] = np.nan
-    df.loc[((df.hma_gap_l)<1) & (df.매매신호==True) ,'매매신호'] = np.nan
+    df.loc[df.band_upper < df.hmac_5 ,'매매신호'] = np.nan
+    df.loc[df.hmac_5<df.hmao_5 ,'매매신호'] = np.nan
+    df.loc[df.hmao_5<df.hmac_10 ,'매매신호'] = np.nan
+    df.loc[df.hmac_10<df.hmao_10 ,'매매신호'] = np.nan
+    df.loc[df.hmao_10<df.band_middle ,'매매신호'] = np.nan
+    df.loc[(df.rsi<90) & (df.매매신호==True) ,'매매신호'] = np.nan
+    # df.loc[((df.hma_gap_l)<1) & (df.매매신호==True) ,'매매신호'] = np.nan
     # df.loc[(df.hei_close < df.hei_open) & (df.매매신호==True) ,'매매신호'] = np.nan
     # df.loc[(df.rsi > 30) & (df.매매신호==True) ,'매매신호'] = np.nan
 
@@ -32,7 +36,7 @@ def sell_stg(df):
     # quit()
     # df.loc[(df.close > df.band_upper) & (df.rsi > 70) ,'매매신호'] = False
     # df.loc[(df.cmo_20 < df.cmo_30) & (df.hmac_5 <= df.hmao_5) ,'매매신호'] = False
-    df.loc[(df.hmac_5 <= df.hmao_10) ,'매매신호'] = False
+    df.loc[df.rsi_gap<-15 ,'매매신호'] = False
     df.loc[(df.hmao_10 <= df.band_lower) ,'매매신호'] = False
 
     # df.loc[(df.close < df.band_middle),'매매신호'] = False
@@ -56,7 +60,7 @@ def losscut_stg(df):
     df.loc[(df.보유여부==True),'손절가'] = df['매수체결가']-(df['매수체결가']*abs(loss_per)*0.01)
     return df
 def df_backtest(df,ticker):
-    df = df[['open', 'high', 'low', 'close', 'ma20', 'ma60', 'rsi','band_upper','band_lower','band_middle','val_rsi','hei_open','hei_close','고저평균대비등락율','hmac_5','hmac_10','hmao_5','hmao_10','cmo_20','cmo_30','hma_gap_l','hma_gap_h']]
+    # df = df[['open', 'high', 'low', 'close', 'ma20', 'ma60', 'rsi','band_upper','band_lower','band_middle','val_rsi','hei_open','hei_close','고저평균대비등락율','hmac_5','hmac_10','hmao_5','hmao_10','cmo_20','cmo_30','hma_gap_l','hma_gap_h']]
     df = buy_stg(df)
     df = sell_stg(df)
     df.loc[(df['매매신호'].shift(1) == True) & (df['low'] < df['매수가']), '보유여부'] = True
@@ -182,12 +186,24 @@ def get_ticker_list(cur,interval):
     return exist_list
 def df_add(df):
     df['val_rsi'] = round(talib.RSI(df['value'], timeperiod=14), 1)
-    df['고저평균대비등락율'] = (df['close'] / ((df['high'] + df['low']) / 2) - 1) * 100
-    df['고저평균대비등락율'] = df['고저평균대비등락율'].round(2)
+    # df['고저평균대비등락율'] = (df['close'] / ((df['high'] + df['low']) / 2) - 1) * 100
+    # df['고저평균대비등락율'] = df['고저평균대비등락율'].round(2)
+    df = make_indicator.sma(df)
+    df = make_indicator.CCI(df)
+    df = make_indicator.CMO(df)
+    df = make_indicator.RSI(df)
+    df = make_indicator.df_add(df)
+    df = make_indicator.BBAND(df)
+    df = make_indicator.ATR(df)
+    df = make_indicator.heikin_ashi(df)
     df['hmao_5'] = df['hei_open'].rolling(window=5).mean().round(3)
     df['hmao_10'] = df['hei_open'].rolling(window=10).mean().round(3)
+    df['hmao_20']=df['hei_open'].rolling(window=20).mean().round(3)
+    df['hmao_30']=df['hei_open'].rolling(window=30).mean().round(3)
     df['hmac_5'] = df['hei_close'].rolling(window=5).mean().round(3)
     df['hmac_10'] = df['hei_close'].rolling(window=10).mean().round(3)
+    df['hmac_20']=df['hei_close'].rolling(window=20).mean().round(3)
+    df['hmac_30']=df['hei_close'].rolling(window=30).mean().round(3)
     df['cmo_5'] = df['cmo'].rolling(window=5).mean().round(3)
     df['cmo_20'] = df['cmo'].rolling(window=20).mean().round(3)
     df['cmo_30'] = df['cmo'].rolling(window=30).mean().round(3)
@@ -197,7 +213,8 @@ def df_add(df):
     df['hma최저']=df['hma'].rolling(window=5).min()
     df['hma_gap_l'] = df['hma']-df['hma최저']
     df['hma_gap_h'] = df['hma최고']-df['hma']
-    # df=make_indicator.heikin_ashi(df)
+    df['고저평균대비등락율'] = ((df['close'] / ((df['high'] + df['low']) / 2) - 1) * 100).round(2)
+    df['rsi_gap'] = df['rsi'] - df['rsi'].shift(1)
     return df
 def hogaUnitCalc(price):
     hogaUnit = 1
@@ -288,19 +305,16 @@ if __name__ == '__main__':
 
     interval = 'minute3'
     bet = 10000
-    optimization = True
+    buy_hoga = -1
+    sell_hoga = 1
+    loss_per = -1
+    optimization = False
     if optimization == True:
-        buy_hoga = -2
-        sell_hoga = 3
-        loss_per = -1
-        sell_per = 0.7
+        pass
     else:
-        buy_hoga = -2
-        sell_hoga = 3
-        loss_per = -1
-        sell_per = 0.7
-    # tickers = get_ticker_list(cur,interval)
-    tickers =['BTC-'+interval]
+        pass
+    tickers = get_ticker_list(cur,interval) #전체 데이터 테스트 할 경우
+    # tickers =['BTC-'+interval]
     # tickers =['AVAX-'+interval,'ALGO-'+interval,'GLM-'+interval,'SRM-'+interval,'TON-'+interval,'BAT-'+interval]
     df_amount = pd.DataFrame()
     for ticker in tickers:

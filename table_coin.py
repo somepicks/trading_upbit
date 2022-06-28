@@ -24,6 +24,7 @@ from pykrx import stock
 from PyQt5.QtTest import QTest
 import talib
 import crosshair
+import make_indicator
 class Window(QWidget):
     def __init__(self, parent=None):
         super(Window, self).__init__(parent=parent)
@@ -420,7 +421,7 @@ class Window(QWidget):
         stock_name = make_stock_name(stock_code)
         print(stock_code)
         print(date)
-        df = get_data_mt(stock_code, date)
+        df = get_ohlcv(stock_code, date)
         df = df_add(df,self.edit1_t,self.edit6_t)
         # View_Chart = self.select_chart()
         self.chart = Chart(df, stock_name, stock_code, date, self.edit2_t, self.edit3_t, self.edit4_t,self.edit5_t,self.edit7_t)
@@ -606,7 +607,7 @@ def df_time(df,start,end):
     return df
 def qtable_moneytop(interval):
     def moneytop():
-        conn = sqlite3.connect(stock_tick_file)
+        conn = sqlite3.connect(ohlcv_file)
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         table_list=cursor.fetchall() #fetchall 한번에 모든 로우 데이터 읽기 (종목코드 읽기)
@@ -637,7 +638,7 @@ def qtable_moneytop(interval):
         return df
     def moneytop_add(df,mt_list):
         df_add = pd.DataFrame(index = mt_list)
-        conn = sqlite3.connect(stock_tick_file)
+        conn = sqlite3.connect(ohlcv_file)
         for stock_code in mt_list:
             # name = make_stock_name(stock_code,stock_list)
             # df_add.loc[stock_code,'종목명'] = name
@@ -870,10 +871,10 @@ def make_stock_name(stock_code):
             stock_name = ticker['korean_name']
     # print(stock_name)
     return stock_name
-def get_data_mt(stock_code,date):
-    if not os.path.isfile(stock_tick_file):
+def get_ohlcv(stock_code,date):
+    if not os.path.isfile(ohlcv_file):
         print('* 파일 없음 - 경로 확인 *')
-    conn = sqlite3.connect(stock_tick_file)
+    conn = sqlite3.connect(ohlcv_file)
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     try:
@@ -895,9 +896,9 @@ def get_data_mt(stock_code,date):
     conn.close()
     return df_db_date
 def get_data(stock_code,buy_time,sell_time):
-    if not os.path.isfile(stock_tick_file):
+    if not os.path.isfile(ohlcv_file):
         print('* 파일 없음 - 경로 확인 *')
-    conn = sqlite3.connect(stock_tick_file)
+    conn = sqlite3.connect(ohlcv_file)
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     try:
@@ -907,12 +908,13 @@ def get_data(stock_code,buy_time,sell_time):
         df = []
     buy_time = int(buy_time)
     sell_time = int(sell_time)
-    for i,ind in enumerate(df.index):
-        if ind == buy_time:
+    for i,idx in enumerate(df.index):
+        if idx == buy_time:
             start = i-gap_interval
-        elif ind == sell_time:
+        elif idx == sell_time:
             end = i+gap_interval
     df = df.iloc[start:end]
+    print(df)
     # df = df[df.index >= buy_time] #date변수의 앞숫자 보다 크거나 같은 값의 범위만 df에 저장
     # df = df[df.index <= sell_time] #date변수의 뒷숫자 보다 작거나 같은 값의 범위만 df에 다시 저장
     df.index = df.index.astype(str)
@@ -945,7 +947,7 @@ def df_backtest(stock_code,df,df_back_list):
     # df.to_csv("D:/PythonProjects/df_marker.csv", header=True, index=True, encoding='utf-8-sig')
     return df
 def db_stock_list():
-    conn = sqlite3.connect(stock_tick_file)
+    conn = sqlite3.connect(ohlcv_file)
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     table = 'codename'
@@ -1200,6 +1202,7 @@ class Chart(QWidget):
         w_dot = pg.mkPen(color='w', width=1, style=QtCore.Qt.DotLine)
         r_dash = pg.mkPen(color='r', width=1, style=QtCore.Qt.DashLine)
         g_dash = pg.mkPen(color=[0,130,153], width=1.2, style=QtCore.Qt.DashLine)
+        color_1 = (255,0,0)
 
         # p1_1.plot(x=xValue, y=df['high'], pen=(120,200,200),name='high')
         # p1_1.plot(x=xValue, y=df['low'], pen=(120,150,150),name='low')
@@ -1224,9 +1227,13 @@ class Chart(QWidget):
 
         # p1_2.plot(x=xValue, y=df['고저평균대비등락율'],pen=(200, 50, 50),fillLevel=int(edit2),brush=(50,50,200,50),name='고저평균대비등락율')
 
-        p1_2.plot(x=xValue, y=df['hmao_20'], pen=(255, 94, 0), name='hmao_20')
-        p1_2.plot(x=xValue, y=df['hmao_30'], pen=(255, 228, 0), name='hmao_30')
-        p1_2.plot(x=xValue, y=df['hmac_20'], pen=(0, 216, 255), name='hmac_20')
+        p1_2.plot(x=xValue, y=df['hmao_5'], pen=color_1, name='hmao_5')
+        p1_2.plot(x=xValue, y=df['hmao_10'], pen=(255, 160, 0), name='hmao_10')
+        p1_2.plot(x=xValue, y=df['hmao_20'], pen=(123, 94, 0), name='hmao_20')
+        p1_2.plot(x=xValue, y=df['hmao_30'], pen=(65, 228, 0), name='hmao_30')
+        p1_2.plot(x=xValue, y=df['hmac_5'], pen=(0, 216, 0), name='hmac_5')
+        p1_2.plot(x=xValue, y=df['hmac_10'], pen=(0, 216, 255), name='hmac_10')
+        p1_2.plot(x=xValue, y=df['hmac_20'], pen=(0, 0, 255), name='hmac_20')
         p1_2.plot(x=xValue, y=df['hmac_30'], pen=(95, 0, 255), name='hmac_30')
         # p1_2.plot(x=xValue, y=df['체결강도평균'],   pen=(204,114, 61), name='체결강도평균')
         # p1_2.plot(x=xValue, y=df['체결강도최고'],   pen=y_dot,         name='체결강도최고')
@@ -1236,9 +1243,9 @@ class Chart(QWidget):
 
         # p1_3.plot(x=xValue, y=df['체강차체강평균'], pen=(50, 50, 200),name='체강차체강평균')
         # p1_3.plot(x=xValue, y=df['체결강도'], pen=(50, 100, 50),name='체결강도')
-        p1_2.plot(x=xValue, y=df['band_lower'], pen=(152, 20, 20), brush=(50,50,200,50),name='band')
-        p1_2.plot(x=xValue, y=df['band_upper'], pen=g_dot,name='band')
-        p1_2.plot(x=xValue, y=df['band_middle'], pen=y_dot,name='band')
+        p1_2.plot(x=xValue, y=df['band_lower'], pen=(152, 20, 20), brush=(50,50,200,50),name='band_l')
+        p1_2.plot(x=xValue, y=df['band_upper'], pen=g_dot,name='band_u')
+        p1_2.plot(x=xValue, y=df['band_middle'], pen=y_dot,name='band_m')
         # p1_3.plot(x=xValue, y=df['band_'], pen=y_dot,name='등락평균')
 
         p1_4.plot(x=xValue,y=df['rsi'], pen='r',fillLevel=int(edit3), brush=(50,50,200,50),name='rsi')
@@ -1247,7 +1254,7 @@ class Chart(QWidget):
 
         # p1_5.plot(x=xValue, y=df['초당거래대금'], pen=(50, 50, 200),name='초당거래대금')
         # p1_5.plot(x=xValue, y=df['초당거래대금변동'], pen=(50, 50, 200),name='초당거래대금변동')
-        p1_5.plot(x=xValue, y=df['거래대금변동평균'],     pen=(200, 50, 50),fillLevel=5,brush=(200,50,50,50),name='거래대금변동평균')
+        p1_5.plot(x=xValue, y=df['rsi_gap'],     pen=(200, 50, 50),fillLevel=5,brush=(200,50,50,50),name='rsi_gap')
         p1_6.plot(x=xValue, y=df['거래대금평균최고'], pen=y_dot,name='거래대금평균최고')
         p1_6.plot(x=xValue, y=df['거래대금평균최고마지'], pen=g_dot,name='거래대금평균최고마지')
         p1_6.plot(x=xValue, y=df['초대금평균차초대금평균최고'],     pen=(120,200,200),name='초대금평균차초대금평균최고')
@@ -1403,7 +1410,15 @@ class Chart(QWidget):
 
 def df_add(df,avg,ch_max):
     avgtime = 30
-
+    print(df)
+    df = make_indicator.sma(df)
+    df = make_indicator.CCI(df)
+    df = make_indicator.CMO(df)
+    df = make_indicator.RSI(df)
+    df = make_indicator.df_add(df)
+    df = make_indicator.BBAND(df)
+    df = make_indicator.ATR(df)
+    df = make_indicator.heikin_ashi(df)
     df['고저평균대비등락율'] = (df['close'] / ((df['high'] + df['low']) / 2) - 1) * 100
     df['고저평균대비등락율'] = df['고저평균대비등락율'].round(2)
     df['고저평균대비등락율절대'] = df['고저평균대비등락율'].abs()
@@ -1412,7 +1427,7 @@ def df_add(df,avg,ch_max):
     df['최고등락평균'] = df['최고등락'].rolling(window=60).mean().round(3)
     df['등락'] = (df['close']-df['open'])/df['open']*100
     df['등락평균'] = df['등락'].rolling(window=60).mean().round(3)
-
+    df['rsi_gap'] = df['rsi'] - df['rsi'].shift(1)
     # df['직전당일거래대금'] = df['당일거래대금'].shift(1)
     df['value'] = df['value']/((df['open']+df['close'])/2)
     df['거래대금차'] = df['value'] - df['value'].shift(1)
@@ -1437,10 +1452,14 @@ def df_add(df,avg,ch_max):
     df['cmo_20']=df['cmo'].rolling(window=20).mean().round(3)
     df['cmo_30']=df['cmo'].rolling(window=30).mean().round(3)
     df['cmo_60']=df['cmo'].rolling(window=60).mean().round(3)
-    df['hmao_20']=df['hei_open'].rolling(window=5).mean().round(3)
-    df['hmao_30']=df['hei_open'].rolling(window=10).mean().round(3)
-    df['hmac_20']=df['hei_close'].rolling(window=5).mean().round(3)
-    df['hmac_30']=df['hei_close'].rolling(window=10).mean().round(3)
+    df['hmao_5'] = df['hei_open'].rolling(window=5).mean().round(3)
+    df['hmao_10'] = df['hei_open'].rolling(window=10).mean().round(3)
+    df['hmao_20']=df['hei_open'].rolling(window=20).mean().round(3)
+    df['hmao_30']=df['hei_open'].rolling(window=30).mean().round(3)
+    df['hmac_5'] = df['hei_close'].rolling(window=5).mean().round(3)
+    df['hmac_10'] = df['hei_close'].rolling(window=10).mean().round(3)
+    df['hmac_20']=df['hei_close'].rolling(window=20).mean().round(3)
+    df['hmac_30']=df['hei_close'].rolling(window=30).mean().round(3)
     df['hma']=df['hmac_20']-df['hmac_30']
     df['hma최고']=df['hma'].rolling(window=5).max()
     df['hma최저']=df['hma'].rolling(window=5).min()
@@ -1492,7 +1511,7 @@ def df_add(df,avg,ch_max):
     return df
 if __name__ == '__main__':
     path = "D:/db_files"
-    stock_tick_file = path + '/upbit.db'
+    ohlcv_file = path + '/upbit.db'
     back_file = path + '/upbit_backtest.db'
 
     start = '00:01'

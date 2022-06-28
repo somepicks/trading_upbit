@@ -464,10 +464,10 @@ if __name__ == '__main__':
 
 
     df_amount = pd.DataFrame()
-    table_list= get_ticker_list(cur,interval)
-    print(table_list)
+    tickers= get_ticker_list(cur,interval)
+    print(tickers)
     # tickers =['AVAX-'+interval,'ALGO-'+interval,'GLM-'+interval,'SRM-'+interval,'TON-'+interval,'BAT-'+interval]
-    for ticker in table_list:
+    for ticker in tickers:
         start = time.time()
         df = pd.read_sql(f"SELECT * FROM '{ticker}'", get_con).set_index('index')
         df = df_add(df)
