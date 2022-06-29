@@ -25,6 +25,8 @@ from PyQt5.QtTest import QTest
 import talib
 import crosshair
 import make_indicator
+import warnings
+warnings.simplefilter("ignore", DeprecationWarning)
 class Window(QWidget):
     def __init__(self, parent=None):
         super(Window, self).__init__(parent=parent)
@@ -325,8 +327,8 @@ class Window(QWidget):
         ohlcv = self.ch_c_ohlcv.isChecked()
         fun = self.ch_c_fun.isChecked()
         self.df3 = qtable_backtest(vj_time,cap,ohlcv,fun)
-        print('self.df3')
-        print(self.df3)
+        # print('self.df3')
+        # print(self.df3)
         table.setRowCount(len(self.df3.index))
         table.setColumnCount(len(self.df3.columns))
         header = table.horizontalHeader()# 컬럼내용에따라 길이 자동조절
@@ -702,7 +704,7 @@ def qtable_back_list(select):
         table = 'stock_vc' #최적화 불러오기
         print('vc 불러오기')
     df = pd.read_sql("SELECT * FROM '"+table+"'", conn).set_index('index')
-    print(df)
+    # print(df)
     df.index = df.index.astype(str)
     df['index'] = df.index.str[4:6]+'/'+df.index.str[6:8]+' '+df.index.str[8:10]+':'+df.index.str[10:12] #db테이블의 테이블 제목이랑 stock_vj의 index가 다름 주의
     df['index'] = df.index
@@ -906,13 +908,20 @@ def get_data(stock_code,buy_time,sell_time):
     except:
         print('* db파일에 종목 없음 *')
         df = []
-    buy_time = int(buy_time)
-    sell_time = int(sell_time)
-    for i,idx in enumerate(df.index):
-        if idx == buy_time:
-            start = i-gap_interval
-        elif idx == sell_time:
-            end = i+gap_interval
+    list_index = df.index.tolist()
+
+    start=(list_index.index(int(buy_time)))-gap_interval
+    end=(list_index.index(int(sell_time)))+gap_interval
+    print(start)
+    print(end)
+    print(len(list_index))
+    if start < 0:
+        start=0
+        print('start',start)
+    if end > len(list_index):
+        end = len(list_index)
+        print(len(list_index))
+        print('end',end)
     df = df.iloc[start:end]
     print(df)
     # df = df[df.index >= buy_time] #date변수의 앞숫자 보다 크거나 같은 값의 범위만 df에 저장
@@ -1517,7 +1526,7 @@ if __name__ == '__main__':
     start = '00:01'
     end = '24:59'
     delay = 20000 #차멍 딜레이시간 ms(밀리세컨)
-    gap_interval = 100
+    gap_interval = 100 #매수 매도시간 앞 뒤로 가져올 데이터 구하기 위해
     # stock_code = '1INCH-minute3'
     # sell_time = '20220325230900'
     # buy_time = '20220325224800'

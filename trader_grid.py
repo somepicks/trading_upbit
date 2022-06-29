@@ -397,7 +397,7 @@ def evaluated():
     df_evalue = pd.DataFrame(wallet,index=[date])
     return df_evalue
 def init_db():
-    if not os.path.isfile(db_path):#실행 중 에러가 났을 경우 다시 시작 했을 때 기존 주문데이터를 갖고오기 위해
+    if not os.path.isfile(db_path):#실행 중 다시 시작 했을 때 기존 주문데이터를 갖고오기 위해
         #잔고조회
         print('초기db생성 중...')
         con = sqlite3.connect(db_path)
