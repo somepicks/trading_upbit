@@ -495,7 +495,7 @@ if __name__ == '__main__':
     df_evalue=init_db() #계산을 위해 초기에만 처음 필요한 데이터
     money_division = 100
     bet_multiple = 1.2
-    rsi = 40
+    rsi = 35
     high_ratio = -0.15
     trailing = 0.8
     sell_per = 1.5

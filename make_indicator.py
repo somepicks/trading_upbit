@@ -132,7 +132,14 @@ def heikin_ashi(df):
     heikin_ashi_df['high'] = heikin_ashi_df.loc[:, ['open', 'close']].join(df['high']).max(axis=1)
     heikin_ashi_df['low'] = heikin_ashi_df.loc[:, ['open', 'close']].join(df['low']).min(axis=1)
     heikin_ashi_df.rename(columns={'open':'hei_open','high':'hei_high','low':'hei_low','close':'hei_close'},inplace=True)
-    # print(heikin_ashi_df)
+    df['hmao_5'] = df['hei_open'].rolling(window=5).mean().round(3)
+    df['hmao_10'] = df['hei_open'].rolling(window=10).mean().round(3)
+    df['hmao_20'] = df['hei_open'].rolling(window=20).mean().round(3)
+    df['hmao_30'] = df['hei_open'].rolling(window=30).mean().round(3)
+    df['hmac_5'] = df['hei_close'].rolling(window=5).mean().round(3)
+    df['hmac_10'] = df['hei_close'].rolling(window=10).mean().round(3)
+    df['hmac_20'] = df['hei_close'].rolling(window=20).mean().round(3)
+    df['hmac_30'] = df['hei_close'].rolling(window=30).mean().round(3)
     df = pd.concat([df, heikin_ashi_df], axis=1)
     return df
 

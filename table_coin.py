@@ -609,7 +609,7 @@ def df_time(df,start,end):
     return df
 def qtable_moneytop(interval):
     def moneytop():
-        conn = sqlite3.connect(ohlcv_file)
+        conn = sqlite3.connect(db_ohlcv)
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         table_list=cursor.fetchall() #fetchall 한번에 모든 로우 데이터 읽기 (종목코드 읽기)
@@ -640,7 +640,7 @@ def qtable_moneytop(interval):
         return df
     def moneytop_add(df,mt_list):
         df_add = pd.DataFrame(index = mt_list)
-        conn = sqlite3.connect(ohlcv_file)
+        conn = sqlite3.connect(db_ohlcv)
         for stock_code in mt_list:
             # name = make_stock_name(stock_code,stock_list)
             # df_add.loc[stock_code,'종목명'] = name
@@ -688,7 +688,7 @@ def qtable_moneytop(interval):
 
     return df
 def qtable_back_list(select):
-    conn = sqlite3.connect(back_file)
+    conn = sqlite3.connect(db_back)
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     table_list = cursor.fetchall()  # fetchall 한번에 모든 로우 데이터 읽기 (종목코드 읽기)
@@ -723,7 +723,7 @@ def qtable_back_list(select):
 def qtable_backtest(v_time,cap,ohlcv,fun):
     def backtest(v_time):
         # print(v_time)
-        conn = sqlite3.connect(back_file)
+        conn = sqlite3.connect(db_back)
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         back_table_list = cursor.fetchall()  # fetchall 한번에 모든 로우 데이터 읽기
@@ -874,9 +874,9 @@ def make_stock_name(stock_code):
     # print(stock_name)
     return stock_name
 def get_ohlcv(stock_code,date):
-    if not os.path.isfile(ohlcv_file):
+    if not os.path.isfile(db_ohlcv):
         print('* 파일 없음 - 경로 확인 *')
-    conn = sqlite3.connect(ohlcv_file)
+    conn = sqlite3.connect(db_ohlcv)
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     try:
@@ -898,9 +898,9 @@ def get_ohlcv(stock_code,date):
     conn.close()
     return df_db_date
 def get_data(stock_code,buy_time,sell_time):
-    if not os.path.isfile(ohlcv_file):
+    if not os.path.isfile(db_ohlcv):
         print('* 파일 없음 - 경로 확인 *')
-    conn = sqlite3.connect(ohlcv_file)
+    conn = sqlite3.connect(db_ohlcv)
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     try:
@@ -956,7 +956,7 @@ def df_backtest(stock_code,df,df_back_list):
     # df.to_csv("D:/PythonProjects/df_marker.csv", header=True, index=True, encoding='utf-8-sig')
     return df
 def db_stock_list():
-    conn = sqlite3.connect(ohlcv_file)
+    conn = sqlite3.connect(db_ohlcv)
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     table = 'codename'
@@ -1520,8 +1520,8 @@ def df_add(df,avg,ch_max):
     return df
 if __name__ == '__main__':
     path = "D:/db_files"
-    ohlcv_file = path + '/upbit.db'
-    back_file = path + '/upbit_backtest.db'
+    db_ohlcv = path + '/upbit.db'
+    db_back = path + '/upbit_backtest.db'
 
     start = '00:01'
     end = '24:59'

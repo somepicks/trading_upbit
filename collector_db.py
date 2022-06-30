@@ -34,27 +34,26 @@ if __name__ == '__main__':
         table_list = np.concatenate(tables).tolist()  # 모든테이블을 리스트로변환 https://codechacha.com/ko/python-flatten-list/
         # [table_list.remove(x) for x in table_list if x == '잔고조회']  # 테이블 리스트에서 잔고조회 삭제
     # quit()
-    sales_days = 1
-    split = {'day': sales_days, 'minute240': sales_days * 6, 'minute60': sales_days * 24,
-                 'minute30': sales_days * 48, 'minute15': sales_days * 96, 'minute10': sales_days * 144,
-                 'minute5': sales_days * 288, 'minute3': sales_days * 480, 'minute1': sales_days * 1440}
+    duration_days = 60
+    split = {'day': duration_days, 'minute240': duration_days * 6, 'minute60': duration_days * 24,
+                 'minute30': duration_days * 48, 'minute15': duration_days * 96, 'minute10': duration_days * 144,
+                 'minute5': duration_days * 288, 'minute3': duration_days * 480, 'minute1': duration_days * 1440}
     intervals = ['minute3']
     tickers = pyupbit.get_tickers(fiat="KRW") #전체 데이터 받을 경우
     # tickers = ['KRW-BTC'] #BTC 데이터만 받을 경우
     for i,ticker in enumerate(tickers):
         for interval in intervals:
             time.sleep(0.1)
-            print(f'df생성 중... [{i+1}:{len(tickers)}] | {ticker} | {interval} | days= {sales_days}일 ',end='...')
+            print(f'df생성 중... [{i+1}:{len(tickers)}] | {ticker} | {interval} | days= {duration_days}일 ',end='...')
             df = pyupbit.get_ohlcv(ticker=ticker,interval=interval,count=split[interval])
             df = df.drop([df.index[-1]]) #마지막 행은 현재 만들어지고 있는거기 때문에 제거
+            df.index = df.index.strftime("%Y%m%d%H%M%S").astype(np.int64)
             symbol = str(ticker[4:])
             table = f'{symbol}-{interval}'
-            print(table)
             con = sqlite3.connect(db_ohlcv)
             if table in table_list:
-                print('yes')
-                quit()
-
+                df_db = pd.read_sql(f"SELECT * FROM'{table}'", con).set_index('index')
+                df = df[df.index > df_db.index[-1]]
             # df = make_indicator.sma(df)
             # df = make_indicator.CCI(df)
             # df = make_indicator.CMO(df)
@@ -64,9 +63,8 @@ if __name__ == '__main__':
             # df = make_indicator.ATR(df)
             # df = make_indicator.heikin_ashi(df)
             # df['고저평균대비등락율'] = ((df['close'] / ((df['high'] + df['low']) / 2) - 1) * 100).round(2)
-            df.index = df.index.strftime("%Y%m%d%H%M%S").astype(np.int64)
             print(' | DB저장 중...',end='')
-            df.to_sql(table, con, if_exists='replace')
+            df.to_sql(table, con, if_exists='append')
             con.commit()
             print('완료')
 color_r1 = (255,0,0)

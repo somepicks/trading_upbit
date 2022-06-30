@@ -19,7 +19,7 @@ def buy_stg(df):
     df.loc[df.hmao_5<df.hmac_10 ,'매매신호'] = np.nan
     df.loc[df.hmac_10<df.hmao_10 ,'매매신호'] = np.nan
     df.loc[df.hmao_10<df.band_middle ,'매매신호'] = np.nan
-    df.loc[(df.rsi<90) & (df.매매신호==True) ,'매매신호'] = np.nan
+    df.loc[df.rsi<90,'매매신호'] = np.nan
     # df.loc[((df.hma_gap_l)<1) & (df.매매신호==True) ,'매매신호'] = np.nan
     # df.loc[(df.hei_close < df.hei_open) & (df.매매신호==True) ,'매매신호'] = np.nan
     # df.loc[(df.rsi > 30) & (df.매매신호==True) ,'매매신호'] = np.nan
@@ -145,7 +145,7 @@ def make_back_db(df):
     df['매도시간_dt']=df['매도시간_dt'].astype(str)
     df['보유시간']=df['보유시간'].astype(str)
     # df = df[df.duplicated(subset=['매수시간', '매도시간'], keep=False)]
-    con = sqlite3.connect(back_file)
+    con = sqlite3.connect(db_back)
     dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
     table = 'coins_vj_'+ dt_now
     df.to_sql(table, con, if_exists='replace')
@@ -155,7 +155,7 @@ def make_back_db(df):
     plus_per = len(plus)/len(df.index)*100
     result = {'interval':interval,'거래횟수': len(df.index),'평균수익률': round(ror,2),'익절': len(plus),
               '손절': len(minus), '승률': round(plus_per,1),'수익금합계': benefit,'평균보유기간': str(had_time)[:15],
-              '배팅금액': bet,'수익률합계': 0, '최대낙폭률': 0,'필요자금': 0, '일평균거래횟수': 0,
+              '백테기간':duration_days,'배팅금액': bet,'수익률합계': 0, '최대낙폭률': 0,'필요자금': 0, '일평균거래횟수': 0,
               '최대보유종목수': 0,'매수전략':'기술적 매수','매도전략':'예술적 매도'}
     df_result = pd.DataFrame(result, index=[dt_now])
     df_result.to_sql('coins_vj', con, if_exists='append')
@@ -163,7 +163,7 @@ def make_back_db(df):
     con.close()
     return df_result
 def make_detail_db(df,ticker):
-    con = sqlite3.connect(back_detail_file)
+    con = sqlite3.connect(db_back_detail)
     df.to_sql(ticker, con, if_exists='replace')
     con.commit()
     con.close()
@@ -297,13 +297,17 @@ def loss_hogaPriceReturn_per(currentPrice): #퍼센트로 반환
 
 if __name__ == '__main__':
     db_path = "D:/db_files"
-    ohlcv_db = db_path + '/upbit.db'
-    back_file = db_path + '/upbit_backtest.db'
-    back_detail_file = db_path + '/upbit_backtest_detail.db'
-    coin_con = sqlite3.connect(ohlcv_db)
-    cur = coin_con.cursor()
-
+    db_ohlcv = db_path + '/upbit.db'
+    db_back = db_path + '/upbit_backtest.db'
+    db_back_detail = db_path + '/upbit_detail.db'
+    con = sqlite3.connect(db_ohlcv)
+    cur = con.cursor()
+    duration_days = 1
+    split = {'day': duration_days, 'minute240': duration_days * 6, 'minute60': duration_days * 24,
+                 'minute30': duration_days * 48, 'minute15': duration_days * 96, 'minute10': duration_days * 144,
+                 'minute5': duration_days * 288, 'minute3': duration_days * 480, 'minute1': duration_days * 1440}
     interval = 'minute3'
+    duration = split[interval]
     bet = 10000
     buy_hoga = -1
     sell_hoga = 1
@@ -318,14 +322,16 @@ if __name__ == '__main__':
     # tickers =['AVAX-'+interval,'ALGO-'+interval,'GLM-'+interval,'SRM-'+interval,'TON-'+interval,'BAT-'+interval]
     df_amount = pd.DataFrame()
     for ticker in tickers:
-        df = pd.read_sql(f"SELECT * FROM '{ticker}'", coin_con).set_index('index')
+        df = pd.read_sql(f"SELECT * FROM '{ticker}'", con).set_index('index')
+        if duration < len(df.index):
+            df = df.iloc[-duration:]
         # df = df.iloc[2490:2520]
         print(ticker,end='')
         df = df_add(df)
         df = df_backtest(df,ticker)
         df_amount = pd.concat([df,df_amount],axis=0)
-    coin_con.commit()
-    coin_con.close()
+    con.commit()
+    con.close()
     df_result = make_back_db(df_amount)
     print(df_result)
     # make_back_db(df)
