@@ -132,14 +132,14 @@ def heikin_ashi(df):
     heikin_ashi_df['high'] = heikin_ashi_df.loc[:, ['open', 'close']].join(df['high']).max(axis=1)
     heikin_ashi_df['low'] = heikin_ashi_df.loc[:, ['open', 'close']].join(df['low']).min(axis=1)
     heikin_ashi_df.rename(columns={'open':'hei_open','high':'hei_high','low':'hei_low','close':'hei_close'},inplace=True)
-    df['hmao_5'] = df['hei_open'].rolling(window=5).mean().round(3)
-    df['hmao_10'] = df['hei_open'].rolling(window=10).mean().round(3)
-    df['hmao_20'] = df['hei_open'].rolling(window=20).mean().round(3)
-    df['hmao_30'] = df['hei_open'].rolling(window=30).mean().round(3)
-    df['hmac_5'] = df['hei_close'].rolling(window=5).mean().round(3)
-    df['hmac_10'] = df['hei_close'].rolling(window=10).mean().round(3)
-    df['hmac_20'] = df['hei_close'].rolling(window=20).mean().round(3)
-    df['hmac_30'] = df['hei_close'].rolling(window=30).mean().round(3)
+    heikin_ashi_df['hmao_5'] = heikin_ashi_df['hei_open'].rolling(window=5).mean().round(3)
+    heikin_ashi_df['hmao_10'] = heikin_ashi_df['hei_open'].rolling(window=10).mean().round(3)
+    heikin_ashi_df['hmao_20'] = heikin_ashi_df['hei_open'].rolling(window=20).mean().round(3)
+    heikin_ashi_df['hmao_30'] = heikin_ashi_df['hei_open'].rolling(window=30).mean().round(3)
+    heikin_ashi_df['hmac_5'] = heikin_ashi_df['hei_close'].rolling(window=5).mean().round(3)
+    heikin_ashi_df['hmac_10'] = heikin_ashi_df['hei_close'].rolling(window=10).mean().round(3)
+    heikin_ashi_df['hmac_20'] = heikin_ashi_df['hei_close'].rolling(window=20).mean().round(3)
+    heikin_ashi_df['hmac_30'] = heikin_ashi_df['hei_close'].rolling(window=30).mean().round(3)
     df = pd.concat([df, heikin_ashi_df], axis=1)
     return df
 
@@ -181,11 +181,8 @@ def df_add(df):
 
     df['봉거래대금평균'] = df['봉거래대금'].rolling(window=avgtime).mean().round(3)
     df['봉거래대금평균최고'] = df['봉거래대금평균'].rolling(window=avgtime).max().round(3)
+    df['rsi_gap'] = df['rsi'] - df['rsi'].shift(1)
 
-
-    # df['매수가'] = np.nan
-    # df['매도가'] = np.nan
-    # df.to_csv(path+'/database/' + stock_name + ".csv", header=True, index=True, encoding='utf-8-sig')
     return df
 def change_price(df):
     df['최고등락'] = (df['high']-df['low'])/df['low']*100
@@ -213,6 +210,8 @@ def RSI(df):
     df['rsi'] = round(talib.RSI(df['close'],timeperiod=14),1)
     df['rsi_upper'] = 70
     df['rsi_lower'] = 30
+    df['val_rsi'] = round(talib.RSI(df['value'], timeperiod=14), 1)
+
 
     return df
 
@@ -224,20 +223,58 @@ def ATR(df):
     df['atr'] = talib.ATR(df['high'],df['low'],df['close'], timeperiod=14)
     return df
 
+def ALL(df):
+    df = sma(df)
+    df = CCI(df)
+    df = CMO(df)
+    df = RSI(df)
+    df = df_add(df)
+    df = BBAND(df)
+    df = ATR(df)
+    df = heikin_ashi(df)
+    df = df_add(df)
+    df = change_price(df)
+    return df
+
+def compare(df):
+    pass
+
 if __name__ == '__main__':
     db_path = 'D:/db_files/'
-    con = sqlite3.connect(db_path+'upbit.db')
+    db_ohlcv = db_path + 'upbit.db'
+    con = sqlite3.connect(db_ohlcv)
     cur = con.cursor()
-    tickers = pyupbit.get_tickers()
-    interval = 'day'  #분봉
-    candle = "minute" + interval
-    df = pyupbit.get_ohlcv(ticker="KRW-BTC", interval=candle, count=900) # 봉 데이터 ("minute5", "minute10" , "minute30" , "minute60" , "week" , "month"
-    # df = renko1(df)
-    df = renko2(df)
-    # df = heikin_ashi(df)
-    df = change_price(df)
-    df.index=df.index.strftime("%Y%m%d%H%M%S").astype(np.int64)
-    df.to_sql('test', con, if_exists='replace')
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    table_list = cur.fetchall()  # fetchall 한번에 모든 로우 데이터 읽기 (종목코드 읽기)
+    if not table_list:
+        print('* DB 테이블이 비어있음 - 확인 필요 *')
+        quit()
+    table_list = np.concatenate(table_list).tolist()  # 모든테이블을 리스트로변환 https://codechacha.com/ko/python-flatten-list/
+    print(table_list)
+    for ticker in table_list:
+        print(f'{ticker} 변환중...')
+        df = pd.read_sql(f"SELECT * FROM '{ticker}'", con).set_index('index')
+        list_columns_exist=df.columns.tolist()
+        df = df_add(df)
+        df = sma(df)
+        df = CCI(df)
+        df = CMO(df)
+        df = RSI(df)
+        df = df_add(df)
+        df = BBAND(df)
+        df = ATR(df)
+        df = heikin_ashi(df)
+        df = change_price(df)
+        list_columns_new = df.columns.tolist()
+        print(list_columns_exist)
+        print(list_columns_new)
+        list_columns = list(set(list_columns_new) - set(list_columns_exist))  # 새로받은 인덱스랑 기존인덱스 비교
+        if list_columns:
+            print(list_columns)
+            print(df[list_columns])
+            cur.execute(f"ALTER TABLE '{ticker}' ADD COLUM {list_columns} ")
 
-    print(df)
+        quit()
+        df.to_sql(ticker, con, if_exists='replace')
     con.commit()
+    con.close()

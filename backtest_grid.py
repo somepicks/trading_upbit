@@ -244,8 +244,8 @@ def df_backtest(df,ticker):
     origin_ror = round((origin_close-origin_open)/origin_open*100,2)
     max_bet = round(df['총매수'].max(),2)
     max_buy = round(df['매수횟수'].max(),2)
-    print(f'배팅배수: {bet_m}, rsi: {rsi}, 고저대비: {high_ratio}, 트레일링스탑: {trail},최소마진{sell_per}, 수익률: {ror}, 수익금: {benefit}, 수수료: {commission}, 매수신호횟수: {signal},매수체결횟수:{lock_buy},매도체결횟수:{lock_sell}, 매수최고금액: {max_bet}, 최대매수횟수: {max_buy}, 최고수익률: {maximum}, 최저수익률: {minimum}, 단순보유수익률: {origin_ror} ')
-    dict_result = {'배팅배수':[bet_m],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'최소마진':[sell_per],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수신호횟수':[signal],'매수체결횟수':[lock_buy],'매도체결횟수':[lock_sell],'매수최고금액':[max_bet],'최대매수횟수':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
+    print(f'{ticker}-배팅배수: {bet_m}, rsi: {rsi}, 고저대비: {high_ratio}, 트레일링스탑: {trail},최소마진{sell_per}, 수익률: {ror}, 수익금: {benefit}, 수수료: {commission}, 매수신호횟수: {signal},매수체결횟수:{lock_buy},매도체결횟수:{lock_sell}, 매수최고금액: {max_bet}, 최대매수횟수: {max_buy}, 최고수익률: {maximum}, 최저수익률: {minimum}, 단순보유수익률: {origin_ror} ')
+    dict_result = {'ticker':[ticker],'배팅배수':[bet_m],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'최소마진':[sell_per],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수신호횟수':[signal],'매수체결횟수':[lock_buy],'매도체결횟수':[lock_sell],'매수최고금액':[max_bet],'최대매수횟수':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
     dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
     df_result = pd.DataFrame(dict_result, index=[dt_now])
     df.dropna(subset=['보유여부'],axis=0,inplace=True) #보유여부가 nan인 행을 찾아 삭제
@@ -283,7 +283,7 @@ def make_back_db(df,df_result,ticker):
     df['보유시간']=df['보유시간'].astype(str)
     # print(df)
     # df = df[df.duplicated(subset=['매수시간', '매도시간'], keep=False)]
-    con = sqlite3.connect(back_file)
+    con = sqlite3.connect(db_back)
     dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
     table = 'coins_vj_' + dt_now
     df.to_sql(table, con, if_exists='replace')
@@ -303,13 +303,13 @@ def make_back_db(df,df_result,ticker):
 
 def make_vc_db(df_result,ticker):
     df_result.rename(index={df_result.index[0]:index_num},inplace=True) #인덱스 이름 바꾸기
-    back_grid_con = sqlite3.connect(back_vc_file)
+    back_grid_con = sqlite3.connect(db_optimization)
     df_result.to_sql('coins_vc_' + ticker + '_grid2', back_grid_con, if_exists='append')
     back_grid_con.commit()
     back_grid_con.close()
 
 def make_detail_db(df,ticker):
-    con = sqlite3.connect(back_detail_file)
+    con = sqlite3.connect(db_back_detail)
     df.to_sql(ticker, con, if_exists='replace')
     con.commit()
     con.close()
@@ -426,14 +426,13 @@ def hogaUnitCalc_per(hogaPrice):
 
 if __name__ == '__main__':
     db_path = 'D:/db_files/'
-    stock_tick_file = db_path + '/upbit.db'
-    ohlcv_db = 'upbit.db'
-    back_file = db_path + '/upbit_backtest.db'
-    back_detail_file = db_path + '/upbit_backtest_grid_detail.db'
-    back_vc_file = db_path + '/upbit_backtest_grid_최적화.db'
+    db_ohlcv = db_path + 'upbit.db'
+    db_back = db_path + 'upbit_backtest.db'
+    db_back_detail = db_path + 'upbit_backtest_grid_detail.db'
+    db_optimization = db_path + 'upbit_backtest_grid_최적화.db'
     index_num = 0
 
-    get_con = sqlite3.connect(db_path+ohlcv_db)
+    get_con = sqlite3.connect(db_ohlcv)
     cur = get_con.cursor()
 
     buy_hoga = -1 #매수호가
@@ -450,11 +449,11 @@ if __name__ == '__main__':
     optimization = True
 
     if optimization == True:
-        bet_multiple = [1.2,1.5]
-        rsis = [34,35,38,40]
-        high_ratios = [-0.15,-0.2]
-        trailings = [0.70,0.8,0.9]
-        sell_pers = [0.7,0.8,0.9,1.0,1.2,1.5] #매도 수익률
+        bet_multiple = [1.2]
+        rsis = [40]
+        high_ratios = [-0.15]
+        trailings = [0.8]
+        sell_pers = [0.3,0.5,0.7,0.9,1.2,1.5] #매도 수익률
     else:
         bet_multiple = [1.2]
         rsis = [35]
@@ -464,13 +463,13 @@ if __name__ == '__main__':
 
 
     df_amount = pd.DataFrame()
-    tickers= get_ticker_list(cur,interval)
-    print(tickers)
-    # tickers =['AVAX-'+interval,'ALGO-'+interval,'GLM-'+interval,'SRM-'+interval,'TON-'+interval,'BAT-'+interval]
+    # tickers= get_ticker_list(cur,interval)
+    # print(tickers)
+    tickers =['BTC-'+interval]
     for ticker in tickers:
         start = time.time()
         df = pd.read_sql(f"SELECT * FROM '{ticker}'", get_con).set_index('index')
-        df = df_add(df)
+        # df = df_add(df)
         get_con.close()
         # df = df.iloc[1640:]
         for bet_m in bet_multiple:

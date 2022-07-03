@@ -13,8 +13,7 @@ import hoga
 import os
 import math
 import telegram
-token = "1883109215:AAHM6-d42-oNmdDO6vmT3SWxB0ICH_od86M"
-bot = telegram.Bot(token)
+
 
 def run():
     con = sqlite3.connect(db_path)
@@ -26,10 +25,12 @@ def run():
         quit()
     table_list = np.concatenate(table_list).tolist()  # 모든테이블을 리스트로변환 https://codechacha.com/ko/python-flatten-list/
     [table_list.remove(x) for x in table_list if x == '잔고조회']  # 테이블 리스트에서 잔고조회 삭제
-    record_evalue(con)
+    record_evalue(con,cur)
     for i,ticker in enumerate(table_list):
         time.sleep(0.1)
         df_db = pd.read_sql(f"SELECT * FROM '{ticker}'", con).set_index('index')
+        # if len(df.index)>1000:
+        #     cur.execute(f"DELETE FROM '잔고조회' WHERE date = :num",{"num":int(df.index[1])})
         df_add = pyupbit.get_ohlcv('KRW-'+ticker, interval=interval, count=5)
         try:
             df_add.index = df_add.index.strftime("%Y%m%d%H%M").astype(np.int64)
@@ -49,6 +50,7 @@ def run():
         except:
             print('데이터 불러올 수 없음 (서버점검검 확인 요망)')
     con.commit()
+    cur.close()
     con.close()
 def make_df(ticker,df,df_add):
     add_lenth = len(df_add.index)
@@ -346,17 +348,14 @@ def ror(df):
     else:
         df.loc[df.index[-1], '최고수익률'] = df.loc[df.index[-2], '최고수익률']
     return df
-def record_evalue(con):
+def record_evalue(con,cur):
     try:
         df_evalue = evaluated()
-        df = pd.read_sql(f"SELECT * FROM '잔고조회'", con).set_index('index')
-        # print(df_evalue.index[0],end=' | ')
-        # print(df.index[-1])
-        # print(pd.Series(df_evalue.index,index=df_evalue.index))
+        df = pd.read_sql(f"SELECT * FROM '잔고조회'", con).set_index('date')
+        if len(df.index)>100:
+            cur.execute(f"DELETE FROM '잔고조회' WHERE date = :num",{"num":int(df.index[1])})
         if df_evalue.index[0] != df.index[-1]:
             df_evalue.to_sql('잔고조회', con, if_exists='append')
-        else:
-            pass
     except:
         print('record_evalue() 에러')
 def evaluated():
@@ -371,7 +370,7 @@ def evaluated():
         for bal in list_del:
             balances.remove(bal)
     except:
-        print(balances)
+        print(balances,'거래되지 않는 화폐 에러')
     value = 0
     for bal in balances:
         ticker = bal.get('currency')
@@ -379,14 +378,10 @@ def evaluated():
         stock = float(bal.get('balance'))
         time.sleep(0.2)
         current = pyupbit.get_current_price(unit+'-'+ticker)
-        # print(unit+'-'+ticker,end='')
-        # print(type(current))
-        # print(type(stock))
         value = current * stock + value
     date = int(datetime.datetime.now().strftime("%Y%m%d%H%M"))
     cash = int(upbit.get_balance(ticker="KRW"))
     bought = round(upbit.get_amount('ALL'))
-    # evalue = evaluated()
     wallet = {'총보유자산':0,'보유현금':0,'매수금액':0,'총평가자산':0,'평가손익':0,'수익률':0 }
     wallet['총보유자산'] = round(cash+value)
     wallet['보유현금'] = cash
@@ -395,6 +390,7 @@ def evaluated():
     wallet['평가손익'] = round(value-bought)
     wallet['수익률'] = round(((value-bought)/bought)*100,2)
     df_evalue = pd.DataFrame(wallet,index=[date])
+    df_evalue.index.names=['date']#인덱스명 재 정의
     return df_evalue
 def init_db():
     if not os.path.isfile(db_path):#실행 중 다시 시작 했을 때 기존 주문데이터를 갖고오기 위해
@@ -435,6 +431,7 @@ def init_db():
             df['보유시간'] = int(0)
             df['uuid'] = 'empty'
             df=df.drop([df.index[-1]]) #마지막 행은 현재 만들어지고 있는거기 때문에 제거
+            # df.index.names = ['date']  # 인덱스명 재 정의
             ticker = str(ticker[4:])
             df.to_sql(ticker, con,if_exists='replace')
             time.sleep(0.2)
@@ -444,7 +441,7 @@ def init_db():
     else:
         print('기존 db 불러오는 중... ')
         con = sqlite3.connect(db_path)
-        df_evalue = pd.read_sql(f"SELECT * FROM '잔고조회'", con).set_index('index')
+        df_evalue = pd.read_sql(f"SELECT * FROM '잔고조회'", con).set_index('date')
     return df_evalue
 
 def update_tickers(table_list,tickers,con,cur):
@@ -482,33 +479,25 @@ if __name__ == '__main__':
     access_key = "i01OXZPmiL17IDgZPcY3typLsb0XVg0PgTxo52Ht"
     secret_key = "gtKrxcdxHO5mQh5FrAuIjH1ZA2kG4TGuxqmDi9bn"
     upbit = pyupbit.Upbit(access_key, secret_key)
+
+    token = "1883109215:AAHM6-d42-oNmdDO6vmT3SWxB0ICH_od86M"
+    bot = telegram.Bot(token)
     db_path = 'D:/db_files/trade_upbit_grid.db'
     interval = 'minute3'
 
     tickers = ['KRW-BTC']
     commission = 0.0005
-    buy_hoga = -1
+    buy_hoga = -5
     sell_hoga = 1
     buy_limit = 5 # 횟수동안 미 체결 시 취소
     sell_limit = -3 # 횟수동안 미 체결 시 취소
-    # divi_m = int(str(interval[6:]))
     df_evalue=init_db() #계산을 위해 초기에만 처음 필요한 데이터
     money_division = 100
     bet_multiple = 1.2
     rsi = 35
     high_ratio = -0.15
     trailing = 0.8
-    sell_per = 1.5
-    # tickers = pyupbit.get_tickers(fiat='KRW')
+    sell_per = 1.2
 
     while True:
-    #     now = int(datetime.datetime.now().strftime('%M')) #현재시간의 분을 숫자로 반환
-    #     # print(now)
-    #     if (now % divi_m) == 0:
-    #         run()
-    #         while True:
-    #             if now != int(datetime.datetime.now().strftime('%M')): #현재시간과 전 시간이 다르면 탈출 한번만 실행하기위해
-    #                 break
         run()
-        # evaluated()
-    # make_df()

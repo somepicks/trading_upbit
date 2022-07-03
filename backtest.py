@@ -60,7 +60,8 @@ def losscut_stg(df):
     df.loc[(df.보유여부==True),'손절가'] = df['매수체결가']-(df['매수체결가']*abs(loss_per)*0.01)
     return df
 def df_backtest(df,ticker):
-    # df = df[['open', 'high', 'low', 'close', 'ma20', 'ma60', 'rsi','band_upper','band_lower','band_middle','val_rsi','hei_open','hei_close','고저평균대비등락율','hmac_5','hmac_10','hmao_5','hmao_10','cmo_20','cmo_30','hma_gap_l','hma_gap_h']]
+    df = df[['open', 'high', 'low', 'close','rsi','band_upper','band_lower','band_middle','val_rsi','hei_open','hei_close',
+             '고저평균대비등락율','hmac_5','hmac_10','hmao_5','hmao_10','cmo_20','cmo_30','hma_gap_l','hma_gap_h','rsi_gap']]
     df = buy_stg(df)
     df = sell_stg(df)
     df.loc[(df['매매신호'].shift(1) == True) & (df['low'] < df['매수가']), '보유여부'] = True
@@ -119,7 +120,7 @@ def df_backtest(df,ticker):
         pass
     ror = round(df['수익률'].mean(),1)
     rop = df['수익금'].sum()
-    print(f' - 수익률: {ror}, 수익금: {rop}')
+    print(f'{ticker} - 수익률: {ror}, 수익금: {rop}')
     return df
 def make_back_db(df):
     ror = df['수익률'].mean()
@@ -155,7 +156,7 @@ def make_back_db(df):
     plus_per = len(plus)/len(df.index)*100
     result = {'interval':interval,'거래횟수': len(df.index),'평균수익률': round(ror,2),'익절': len(plus),
               '손절': len(minus), '승률': round(plus_per,1),'수익금합계': benefit,'평균보유기간': str(had_time)[:15],
-              '백테기간':duration_days,'배팅금액': bet,'수익률합계': 0, '최대낙폭률': 0,'필요자금': 0, '일평균거래횟수': 0,
+              '거래일수':duration_days,'배팅금액': bet,'수익률합계': 0, '최대낙폭률': 0,'필요자금': 0, '일평균거래횟수': 0,
               '최대보유종목수': 0,'매수전략':'기술적 매수','매도전략':'예술적 매도'}
     df_result = pd.DataFrame(result, index=[dt_now])
     df_result.to_sql('coins_vj', con, if_exists='append')
@@ -185,25 +186,26 @@ def get_ticker_list(cur,interval):
 
     return exist_list
 def df_add(df):
+    df_exist = df
     df['val_rsi'] = round(talib.RSI(df['value'], timeperiod=14), 1)
     # df['고저평균대비등락율'] = (df['close'] / ((df['high'] + df['low']) / 2) - 1) * 100
     # df['고저평균대비등락율'] = df['고저평균대비등락율'].round(2)
-    df = make_indicator.sma(df)
-    df = make_indicator.CCI(df)
-    df = make_indicator.CMO(df)
-    df = make_indicator.RSI(df)
-    df = make_indicator.df_add(df)
-    df = make_indicator.BBAND(df)
-    df = make_indicator.ATR(df)
-    df = make_indicator.heikin_ashi(df)
-    df['hmao_5'] = df['hei_open'].rolling(window=5).mean().round(3)
-    df['hmao_10'] = df['hei_open'].rolling(window=10).mean().round(3)
-    df['hmao_20']=df['hei_open'].rolling(window=20).mean().round(3)
-    df['hmao_30']=df['hei_open'].rolling(window=30).mean().round(3)
-    df['hmac_5'] = df['hei_close'].rolling(window=5).mean().round(3)
-    df['hmac_10'] = df['hei_close'].rolling(window=10).mean().round(3)
-    df['hmac_20']=df['hei_close'].rolling(window=20).mean().round(3)
-    df['hmac_30']=df['hei_close'].rolling(window=30).mean().round(3)
+    # df = make_indicator.sma(df)
+    # df = make_indicator.CCI(df)
+    # df = make_indicator.CMO(df)
+    # df = make_indicator.RSI(df)
+    # df = make_indicator.df_add(df)
+    # df = make_indicator.BBAND(df)
+    # df = make_indicator.ATR(df)
+    # df = make_indicator.heikin_ashi(df)
+    # df['hmao_5'] = df['hei_open'].rolling(window=5).mean().round(3)
+    # df['hmao_10'] = df['hei_open'].rolling(window=10).mean().round(3)
+    # df['hmao_20']=df['hei_open'].rolling(window=20).mean().round(3)
+    # df['hmao_30']=df['hei_open'].rolling(window=30).mean().round(3)
+    # df['hmac_5'] = df['hei_close'].rolling(window=5).mean().round(3)
+    # df['hmac_10'] = df['hei_close'].rolling(window=10).mean().round(3)
+    # df['hmac_20']=df['hei_close'].rolling(window=20).mean().round(3)
+    # df['hmac_30']=df['hei_close'].rolling(window=30).mean().round(3)
     df['cmo_5'] = df['cmo'].rolling(window=5).mean().round(3)
     df['cmo_20'] = df['cmo'].rolling(window=20).mean().round(3)
     df['cmo_30'] = df['cmo'].rolling(window=30).mean().round(3)
@@ -215,6 +217,12 @@ def df_add(df):
     df['hma_gap_h'] = df['hma최고']-df['hma']
     df['고저평균대비등락율'] = ((df['close'] / ((df['high'] + df['low']) / 2) - 1) * 100).round(2)
     df['rsi_gap'] = df['rsi'] - df['rsi'].shift(1)
+    list_col_exist = df_exist.columns.tolist()
+    list_col = df.columns.tolist()
+    list_columns = list(set(list_col) - set(list_col_exist))  # 새로받은 인덱스랑 기존인덱스 비교
+    df_new=df[list_columns]
+    df = pd.concat([df_exist, df_new])
+    print(df.columns)
     return df
 def hogaUnitCalc(price):
     hogaUnit = 1
@@ -296,17 +304,16 @@ def loss_hogaPriceReturn_per(currentPrice): #퍼센트로 반환
             return round(minPrice, 2)
 
 if __name__ == '__main__':
-    db_path = "D:/db_files"
-    db_ohlcv = db_path + '/upbit.db'
-    db_back = db_path + '/upbit_backtest.db'
-    db_back_detail = db_path + '/upbit_detail.db'
-    con = sqlite3.connect(db_ohlcv)
-    cur = con.cursor()
-    duration_days = 1
+    db_path = "D:/db_files/"
+    db_ohlcv = db_path + 'upbit.db'
+    db_back = db_path + 'upbit_backtest.db'
+    db_back_detail = db_path + 'upbit_detail.db'
+    db_optimization = db_path + 'upbit_backtest_최적화.db'
+    interval = 'minute3'
+    duration_days = 3
     split = {'day': duration_days, 'minute240': duration_days * 6, 'minute60': duration_days * 24,
                  'minute30': duration_days * 48, 'minute15': duration_days * 96, 'minute10': duration_days * 144,
                  'minute5': duration_days * 288, 'minute3': duration_days * 480, 'minute1': duration_days * 1440}
-    interval = 'minute3'
     duration = split[interval]
     bet = 10000
     buy_hoga = -1
@@ -317,17 +324,18 @@ if __name__ == '__main__':
         pass
     else:
         pass
-    tickers = get_ticker_list(cur,interval) #전체 데이터 테스트 할 경우
-    # tickers =['BTC-'+interval]
+    con = sqlite3.connect(db_ohlcv)
+    cur = con.cursor()
+    # tickers = get_ticker_list(cur,interval) #전체 데이터 테스트 할 경우
+    tickers =['BTC-'+interval]
     # tickers =['AVAX-'+interval,'ALGO-'+interval,'GLM-'+interval,'SRM-'+interval,'TON-'+interval,'BAT-'+interval]
     df_amount = pd.DataFrame()
     for ticker in tickers:
         df = pd.read_sql(f"SELECT * FROM '{ticker}'", con).set_index('index')
+        df = df_add(df)
         if duration < len(df.index):
             df = df.iloc[-duration:]
         # df = df.iloc[2490:2520]
-        print(ticker,end='')
-        df = df_add(df)
         df = df_backtest(df,ticker)
         df_amount = pd.concat([df,df_amount],axis=0)
     con.commit()
