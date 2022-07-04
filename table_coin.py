@@ -520,7 +520,7 @@ class Window(QWidget):
     def holic_back(self,delay):
         # print(df_back)
         # df_back.to_excel('table.xlsx')
-        print(self.df3)
+        # print(self.df3)
         self.df3['날짜'] = self.df3.매수시간.astype(str).str[4:8] ##index에서 str짤라가지고 date컬럼 생성
         groups = self.df3.groupby('날짜')  # 날짜별 그룹 만들기
         df_back2 = pd.DataFrame()
@@ -637,7 +637,7 @@ def qtable_moneytop(interval):
         # df.columns = days
         for day in days:
             df[day] = day
-        print(df)
+        # print(df)
         return df
     def moneytop_add(df,mt_list):
         df_add = pd.DataFrame(index = mt_list)
@@ -1208,6 +1208,7 @@ class Chart(QWidget):
         # p1_1.plot(x=xValue, y=df['low'], pen=(120,150,150),name='low')
         # p1_1.plot(x=xValue, y=df['이평60마지' ], pen=y_dot,name='이평60마지')
         p1_1.plot(x=xValue, y=df['ma5'], pen=(128, 65,117),name='ma5')
+        p1_1.plot(x=xValue, y=df['low'], pen=cl.orange_1,name='low')
         # p1_1.plot(x=xValue, y=df['이평300마지' ], pen=g_dot,name='이평300마지')
         p1_1.plot(x=xValue, y=df['ma60'], pen=(120, 150, 50),name='ma60')
         # p1_1.plot(x=xValue, y=df['ma60마지'], pen=r_dash,name='ma60마지')
@@ -1226,7 +1227,6 @@ class Chart(QWidget):
         # p1_1.addItem(lr)
 
         # p1_2.plot(x=xValue, y=df['고저평균대비등락율'],pen=(200, 50, 50),fillLevel=int(edit2),brush=(50,50,200,50),name='고저평균대비등락율')
-        print(df['hmao_10'])
         # p1_2.plot(x=xValue, y=df['hmao_5'], pen=(255,0,0), name='hmao_5')
         # p1_2.plot(x=xValue, y=df['hmao_10'], pen=(255.228,0), name='hmao_10')
         # p1_2.plot(x=xValue, y=df['hmao_20'], pen=(123, 94, 0), name='hmao_20')

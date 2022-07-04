@@ -140,13 +140,17 @@ def heikin_ashi(df):
     heikin_ashi_df['hmac_10'] = heikin_ashi_df['hei_close'].rolling(window=10).mean().round(3)
     heikin_ashi_df['hmac_20'] = heikin_ashi_df['hei_close'].rolling(window=20).mean().round(3)
     heikin_ashi_df['hmac_30'] = heikin_ashi_df['hei_close'].rolling(window=30).mean().round(3)
+    heikin_ashi_df['hma']=heikin_ashi_df['hmac_5']-heikin_ashi_df['hmac_10']
+    heikin_ashi_df['hma최고']=heikin_ashi_df['hma'].rolling(window=5).max()
+    heikin_ashi_df['hma최저']=heikin_ashi_df['hma'].rolling(window=5).min()
+    heikin_ashi_df['hma_gap_l'] = heikin_ashi_df['hma']-heikin_ashi_df['hma최저']
+    heikin_ashi_df['hma_gap_h'] = heikin_ashi_df['hma최고']-heikin_ashi_df['hma']
     df = pd.concat([df, heikin_ashi_df], axis=1)
     return df
 
 def df_add(df):
     avgtime = 30
-    df['고저평균대비등락율'] = (df['close'] / ((df['high'] + df['low']) / 2) - 1) * 100
-    df['고저평균대비등락율'] = df['고저평균대비등락율'].round(2)
+    df['고저평균대비등락율'] = ((df['close'] / ((df['high'] + df['low']) / 2) - 1) * 100).round(2)
 
     df['최고등락'] = (df['high']-df['low'])/df['low']*100
     df['최고등락평균'] = df['최고등락'].rolling(window=60).mean().round(3)
@@ -181,7 +185,6 @@ def df_add(df):
 
     df['봉거래대금평균'] = df['봉거래대금'].rolling(window=avgtime).mean().round(3)
     df['봉거래대금평균최고'] = df['봉거래대금평균'].rolling(window=avgtime).max().round(3)
-    df['rsi_gap'] = df['rsi'] - df['rsi'].shift(1)
 
     return df
 def change_price(df):
@@ -204,6 +207,10 @@ def CCI(df):
 
 def CMO(df):
     df['cmo'] = talib.CMO(df['close'], timeperiod=14)
+    df['cmo_5'] = df['cmo'].rolling(window=5).mean().round(3)
+    df['cmo_20'] = df['cmo'].rolling(window=20).mean().round(3)
+    df['cmo_30'] = df['cmo'].rolling(window=30).mean().round(3)
+    df['cmo_60'] = df['cmo'].rolling(window=60).mean().round(3)
     return df
 
 def RSI(df):
@@ -211,7 +218,7 @@ def RSI(df):
     df['rsi_upper'] = 70
     df['rsi_lower'] = 30
     df['val_rsi'] = round(talib.RSI(df['value'], timeperiod=14), 1)
-
+    df['rsi_gap'] = round(df['rsi'] - df['rsi'].shift(1),1)
 
     return df
 
@@ -273,8 +280,8 @@ if __name__ == '__main__':
             print(list_columns)
             print(df[list_columns])
             cur.execute(f"ALTER TABLE '{ticker}' ADD COLUM {list_columns} ")
-
         quit()
+
         df.to_sql(ticker, con, if_exists='replace')
     con.commit()
     con.close()

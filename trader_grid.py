@@ -28,10 +28,11 @@ def run():
     record_evalue(con,cur)
     for i,ticker in enumerate(table_list):
         time.sleep(0.1)
-        df_db = pd.read_sql(f"SELECT * FROM '{ticker}'", con).set_index('index')
-        # if len(df.index)>1000:
-        #     cur.execute(f"DELETE FROM '잔고조회' WHERE date = :num",{"num":int(df.index[1])})
+        df_db = pd.read_sql(f"SELECT * FROM '{ticker}'", con).set_index('date')
+        if len(df_db.index)>1500: #인덱스가 n개 이상이면 삭제
+            cur.execute(f"DELETE FROM '{ticker}' WHERE date = :num",{"num":int(df_db.index[1])})
         df_add = pyupbit.get_ohlcv('KRW-'+ticker, interval=interval, count=5)
+        df_add.index.names = ['date']  # 인덱스명 재 정의
         try:
             df_add.index = df_add.index.strftime("%Y%m%d%H%M").astype(np.int64)
             df_add = df_add.drop([df_add.index[-1]]) #마지막 행은 현재 만들어지고 있는거기 때문에 제거
@@ -431,7 +432,7 @@ def init_db():
             df['보유시간'] = int(0)
             df['uuid'] = 'empty'
             df=df.drop([df.index[-1]]) #마지막 행은 현재 만들어지고 있는거기 때문에 제거
-            # df.index.names = ['date']  # 인덱스명 재 정의
+            df.index.names = ['date']  # 인덱스명 재 정의
             ticker = str(ticker[4:])
             df.to_sql(ticker, con,if_exists='replace')
             time.sleep(0.2)
@@ -483,7 +484,7 @@ if __name__ == '__main__':
     token = "1883109215:AAHM6-d42-oNmdDO6vmT3SWxB0ICH_od86M"
     bot = telegram.Bot(token)
     db_path = 'D:/db_files/trade_upbit_grid.db'
-    interval = 'minute3'
+    interval = 'minute1'
 
     tickers = ['KRW-BTC']
     commission = 0.0005
@@ -494,7 +495,7 @@ if __name__ == '__main__':
     df_evalue=init_db() #계산을 위해 초기에만 처음 필요한 데이터
     money_division = 100
     bet_multiple = 1.2
-    rsi = 35
+    rsi = 20
     high_ratio = -0.15
     trailing = 0.8
     sell_per = 1.2

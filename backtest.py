@@ -13,24 +13,30 @@ pd.set_option("display.unicode.east_asian_width", True)
 def buy_stg(df):
     # df.loc[(df.rsi < 30) & (df.ma20 > df.ma60) & (df.low<df.band_lower),'매매신호'] = True
     # df['매매신호'] = True
-    df.loc[df.index ,'매매신호'] = True
-    df.loc[df.band_upper < df.hmac_5 ,'매매신호'] = np.nan
-    df.loc[df.hmac_5<df.hmao_5 ,'매매신호'] = np.nan
-    df.loc[df.hmao_5<df.hmac_10 ,'매매신호'] = np.nan
-    df.loc[df.hmac_10<df.hmao_10 ,'매매신호'] = np.nan
-    df.loc[df.hmao_10<df.band_middle ,'매매신호'] = np.nan
-    df.loc[df.rsi<90,'매매신호'] = np.nan
+    df.loc[df.index ,'매수신호'] = True
+    df.loc[df.band_upper < df.hmac_5 ,'매수신호'] = np.nan
+    df.loc[df.hmac_5<df.hmao_5 ,'매수신호'] = np.nan
+    df.loc[df.hmao_5<df.hmac_10 ,'매수신호'] = np.nan
+    df.loc[df.hmac_10<df.hmao_10 ,'매수신호'] = np.nan
+    df.loc[df.hmao_10<df.band_middle ,'매수신호'] = np.nan
+    # df.loc[df.rsi<90,'매매신호'] = np.nan
     # df.loc[((df.hma_gap_l)<1) & (df.매매신호==True) ,'매매신호'] = np.nan
     # df.loc[(df.hei_close < df.hei_open) & (df.매매신호==True) ,'매매신호'] = np.nan
     # df.loc[(df.rsi > 30) & (df.매매신호==True) ,'매매신호'] = np.nan
 
-    df.loc[(df['매매신호'].shift(1)==True) , '매수가'] = df['open'].apply(buy_hoga_return)
-    df['매수가'].fillna(method='ffill', inplace=True)  # nan값을 윗 값으로 채움
+    df.loc[(df['매수신호'].shift(1)==True) , '매수호가'] = df['open'].apply(buy_hoga_return)
+    # df['매수호가'].fillna(method='ffill', inplace=True)  # nan값을 윗 값으로 채움
+    # df.loc[(df.매수호가>df.low) & (df['매수신호'].shift(1)==1) ,'매수체결가'] = df.매수호가
 
-    # df.loc[(df['매매신호'].shift(1)==True) , '손절가'] = df['매수가'].apply(loss_hogaPriceReturn_per)
+    for i in range(signal_buy-1):
+        df.loc[(df['매수신호'].shift(1)==i+1) & (df.매수신호!=True) & (df.매수체결가.isnull()) ,'매수신호'] = i+2
+    #     df.loc[(df['매수신호'].shift(1)==i+2) & (df.매수신호!=True) & (df['매수체결가'].shift(1).isnull()) ,'매수호가'] = df['매수호가'].shift(1)
+    #     df.loc[(df.매수호가>df.low) & (df['매수신호'].shift(1)>0) ,'매수체결가'] = df.매수호가
+
+    # df.loc[(df['매매신호'].shift(1)==True) , '손절가'] = df['매수호가'].apply(loss_hogaPriceReturn_per)
     return df
 def sell_stg(df):
-    # df['매수대비'] = (df['close']-df['매수가'])/df['매수가']*100
+    # df['매수대비'] = (df['close']-df['매수호가'])/df['매수호가']*100
 
     # print(df)
     # quit()
@@ -49,7 +55,7 @@ def losscut_stg(df):
     df.loc[df.index,'보유여부'] = np.nan
     df=buy_stg(df)
     df=sell_stg(df)
-    df.loc[(df['매매신호'].shift(1) == True) & (df['low'] < df['매수가']) & (df['손절']!=True), '보유여부'] = True
+    df.loc[(df['매매신호'].shift(1) == True) & (df['low'] < df['매수호가']) & (df['손절']!=True), '보유여부'] = True
     df.loc[(df['매매신호'].shift(1) == False) & (df['high'] > df['매도가']) | (df['손절']==True), '보유여부'] = False
 
     df['보유여부'].ffill(inplace=True) # NaN값을 윗 값으로 채움
@@ -61,14 +67,17 @@ def losscut_stg(df):
     return df
 def df_backtest(df,ticker):
     df = df[['open', 'high', 'low', 'close','rsi','band_upper','band_lower','band_middle','val_rsi','hei_open','hei_close',
-             '고저평균대비등락율','hmac_5','hmac_10','hmao_5','hmao_10','cmo_20','cmo_30','hma_gap_l','hma_gap_h','rsi_gap']]
+             '고저평균대비등락율','hmac_5','hmac_10','hmao_5','hmao_10','rsi_gap']]
+
     df = buy_stg(df)
+    make_detail_db(df,ticker)
+    quit()
     df = sell_stg(df)
-    df.loc[(df['매매신호'].shift(1) == True) & (df['low'] < df['매수가']), '보유여부'] = True
+    df.loc[(df['매매신호'].shift(1) == True) & (df['low'] < df['매수호가']), '보유여부'] = True
     df.loc[(df['매매신호'].shift(1) == False) & (df['high'] > df['매도가']), '보유여부'] = False
     df['보유여부'].ffill(inplace=True) # NaN값을 윗 값으로 채움
     df['보유여부'].fillna(False, inplace=True) # NaN값을 False로 채움
-    df.loc[(df['보유여부']==True) & (df['보유여부'].shift(1)==False),'매수체결가' ]= df['매수가']
+    df.loc[(df['보유여부']==True) & (df['보유여부'].shift(1)==False),'매수체결가' ]= df['매수호가']
     df.loc[(df['보유여부']==False) & (df['보유여부'].shift(1)==True),'매도체결가' ]= df['매도가']
     if df.loc[df.index[-1],'보유여부'] == True: #공정한 백테를 위해 마지막에 일괄 정리
         df.loc[df.index[-1],'매도체결가'] = df.loc[df.index[-1],'close']
@@ -100,7 +109,6 @@ def df_backtest(df,ticker):
     df.loc[df.index[-1],'매도시간'] = pd.Series(df.index,index=df.index).index[-1] #마지막에 일괄 매도이기 때문에 매도시간 마지막행을 인덱스마지막행으로 변경
     df['매수시간'] = df['매수시간'].astype(np.int64)
     df['매도시간'] = df['매도시간'].astype(np.int64)
-    make_detail_db(df,ticker)
 
     # index_x = df[(df['매수시간'].isnull()) & (df['매도시간'].isnull())].index
     # index_x = df[df['매도시간'].isnull()].index # 매도시간이 비어있는 행을(매수시간행)을 반환
@@ -120,7 +128,9 @@ def df_backtest(df,ticker):
         pass
     ror = round(df['수익률'].mean(),1)
     rop = df['수익금'].sum()
-    print(f'{ticker} - 수익률: {ror}, 수익금: {rop}')
+    lock_sell = len(df.loc[df['매도체결가']>0])  #매도체결가 1보다 높은 값 추출
+
+    print(f'{ticker} - 수익률: {ror}, 수익금: {rop}, 매수횟수: {lock_sell}')
     return df
 def make_back_db(df):
     ror = df['수익률'].mean()
@@ -134,7 +144,7 @@ def make_back_db(df):
     df['매수체결가'] = df['매수체결가'].astype(str)
     df['매도체결가'] = df['매도체결가'].astype(str)
     df['수익률'] = df['수익률'].astype(str)
-    df.rename(columns={'매수체결가': '매수가'}, inplace=True)
+    df.rename(columns={'매수체결가': '매수호가'}, inplace=True)
     df.rename(columns={'매도체결가': '매도가'}, inplace=True)
 
     print(df)
@@ -152,8 +162,9 @@ def make_back_db(df):
     df.to_sql(table, con, if_exists='replace')
     # group = df.groupby(df.index)
     # print(group.size().max())
-
-    plus_per = len(plus)/len(df.index)*100
+    plus_per = 50
+    if not df.empty:
+        plus_per = len(plus)/len(df.index)*100
     result = {'interval':interval,'거래횟수': len(df.index),'평균수익률': round(ror,2),'익절': len(plus),
               '손절': len(minus), '승률': round(plus_per,1),'수익금합계': benefit,'평균보유기간': str(had_time)[:15],
               '거래일수':duration_days,'배팅금액': bet,'수익률합계': 0, '최대낙폭률': 0,'필요자금': 0, '일평균거래횟수': 0,
@@ -183,47 +194,20 @@ def get_ticker_list(cur,interval):
     #     if str(ticker[position:]) == interval:
     #         exist_list.append(ticker)
     [exist_list.append(x) for x in table_list if str(x[x.find('-')+1:]) == interval] #for문을 컴프리헨션으로
-
     return exist_list
+
 def df_add(df):
-    df_exist = df
-    df['val_rsi'] = round(talib.RSI(df['value'], timeperiod=14), 1)
-    # df['고저평균대비등락율'] = (df['close'] / ((df['high'] + df['low']) / 2) - 1) * 100
-    # df['고저평균대비등락율'] = df['고저평균대비등락율'].round(2)
-    # df = make_indicator.sma(df)
-    # df = make_indicator.CCI(df)
-    # df = make_indicator.CMO(df)
-    # df = make_indicator.RSI(df)
-    # df = make_indicator.df_add(df)
-    # df = make_indicator.BBAND(df)
-    # df = make_indicator.ATR(df)
-    # df = make_indicator.heikin_ashi(df)
-    # df['hmao_5'] = df['hei_open'].rolling(window=5).mean().round(3)
-    # df['hmao_10'] = df['hei_open'].rolling(window=10).mean().round(3)
-    # df['hmao_20']=df['hei_open'].rolling(window=20).mean().round(3)
-    # df['hmao_30']=df['hei_open'].rolling(window=30).mean().round(3)
-    # df['hmac_5'] = df['hei_close'].rolling(window=5).mean().round(3)
-    # df['hmac_10'] = df['hei_close'].rolling(window=10).mean().round(3)
-    # df['hmac_20']=df['hei_close'].rolling(window=20).mean().round(3)
-    # df['hmac_30']=df['hei_close'].rolling(window=30).mean().round(3)
-    df['cmo_5'] = df['cmo'].rolling(window=5).mean().round(3)
-    df['cmo_20'] = df['cmo'].rolling(window=20).mean().round(3)
-    df['cmo_30'] = df['cmo'].rolling(window=30).mean().round(3)
-    df['cmo_60'] = df['cmo'].rolling(window=60).mean().round(3)
-    df['hma']=df['hmac_5']-df['hmac_10']
-    df['hma최고']=df['hma'].rolling(window=5).max()
-    df['hma최저']=df['hma'].rolling(window=5).min()
-    df['hma_gap_l'] = df['hma']-df['hma최저']
-    df['hma_gap_h'] = df['hma최고']-df['hma']
-    df['고저평균대비등락율'] = ((df['close'] / ((df['high'] + df['low']) / 2) - 1) * 100).round(2)
-    df['rsi_gap'] = df['rsi'] - df['rsi'].shift(1)
+    df_exist = df.copy()
+    df = make_indicator.ALL(df)
     list_col_exist = df_exist.columns.tolist()
     list_col = df.columns.tolist()
     list_columns = list(set(list_col) - set(list_col_exist))  # 새로받은 인덱스랑 기존인덱스 비교
     df_new=df[list_columns]
-    df = pd.concat([df_exist, df_new])
-    print(df.columns)
+    # print(f'기존 컬럼:{list_col_exist}')
+    # print(f'새로운 컬럼:{list_columns}')
+    df = pd.concat([df_exist, df_new],axis=1)
     return df
+
 def hogaUnitCalc(price):
     hogaUnit = 1
     if price < 10:
@@ -318,6 +302,10 @@ if __name__ == '__main__':
     bet = 10000
     buy_hoga = -1
     sell_hoga = 1
+    signal_buy = 5 #매수신호 시 상한 횟수
+    signal_sell = 3 #매도신호 시 상한 횟수
+    fee_buy = 0.05 # %
+    fee_sell = 0.05 # %
     loss_per = -1
     optimization = False
     if optimization == True:
@@ -327,12 +315,12 @@ if __name__ == '__main__':
     con = sqlite3.connect(db_ohlcv)
     cur = con.cursor()
     # tickers = get_ticker_list(cur,interval) #전체 데이터 테스트 할 경우
-    tickers =['BTC-'+interval]
+    tickers =['GMT-'+interval]
     # tickers =['AVAX-'+interval,'ALGO-'+interval,'GLM-'+interval,'SRM-'+interval,'TON-'+interval,'BAT-'+interval]
     df_amount = pd.DataFrame()
     for ticker in tickers:
         df = pd.read_sql(f"SELECT * FROM '{ticker}'", con).set_index('index')
-        df = df_add(df)
+        # df = df_add(df)
         if duration < len(df.index):
             df = df.iloc[-duration:]
         # df = df.iloc[2490:2520]
