@@ -8,7 +8,33 @@ pd.set_option('mode.chained_assignment',  None) # SettingWithCopyWarning 경고�
 pd.set_option('display.max_columns',None) #모든 열을 보고자 할 때
 pd.set_option('display.width',1500)
 pd.set_option("display.unicode.east_asian_width", True)
-
+def df_col(df):
+    df = df[['open', 'high', 'low', 'close','rsi', '고저평균대비등락율','hmao_20','hmac_20','band_lower']]
+    df['매수신호'] = np.nan
+    df['매수호가'] = np.nan
+    df['매수체결가'] = np.nan
+    df['매도신호'] = np.nan
+    df['매도호가'] = np.nan
+    df['매도체결가'] = np.nan
+    df['매수그룹'] = np.nan
+    df['매수횟수'] = np.nan
+    df['보유여부'] = np.nan
+    df['보유현금'] = bet
+    df['매수금액'] = np.nan
+    df['총매수'] = np.nan
+    df['보유수량'] = np.nan
+    df['총평가'] = int(0)
+    df['수익률'] = np.nan
+    df['최고수익률'] = np.nan
+    # df['최고대비'] = np.nan
+    df['수익금'] = float(0)
+    df['수수료'] = int(0)
+    df['매수시간'] = int(0)
+    df['매도시간'] = np.nan
+    df['보유시간'] = np.nan
+    df['손절'] = np.nan
+    df['손절가'] = np.nan
+    return df
 def buy_stg(df):
     # df.loc[(df.rsi < 30) & (df.ma20 > df.ma60) & (df.low<df.band_lower),'매매신호'] = True
     # df['매매신호'] = True
@@ -49,7 +75,7 @@ def sell_stg(df,i):
     df.loc[(df.매수그룹==i)&(df.매도호가<df.high) & (df['매도신호'].shift(1)==1) ,'매도체결가'] = df.매도호가
     # if True:
     #     return df
-    cancel = True
+    cancel = True # 매도 안될 시 매도 취소
     for x in range(signal_sell):
         df.loc[(df.매수그룹==i)&(df['매도신호'].shift(1)==x+1) & (df['매도신호']>0) & (df.매도체결가.isnull()) ,'매도신호'] = x+2
         df.loc[(df.매수그룹==i)&(df['매도신호'].shift(1)==x+2) & (df['매도신호']>0) & (df['매도체결가'].shift(1).isnull()) ,'매도호가'] = df['매도호가'].shift(1)
@@ -60,7 +86,6 @@ def sell_stg(df,i):
             df.loc[df['매도신호'].shift(1)>signal_sell,'매도신호'] = np.nan
             df.loc[df['매도신호'].shift(1)>signal_sell,'매도호가'] = np.nan
             df.loc[df['매도신호'].shift(1)>signal_sell,'매도체결가'] = np.nan
-
     return df
 # def losscut_stg(df):
 #     df.loc[df['기간수익률']<loss_per,'손절'] = True
@@ -79,34 +104,6 @@ def sell_stg(df,i):
 #     df.loc[(df.보유여부==True),'손절가'] = df['매수체결가']-(df['매수체결가']*abs(loss_per)*0.01)
 #     return df
 def df_backtest(df,ticker):
-    df = df[['open', 'high', 'low', 'close','rsi', '고저평균대비등락율','hmao_20','hmac_20','band_lower']]
-    df['매수신호'] = np.nan
-    df['매수호가'] = np.nan
-    df['매수체결가'] = np.nan
-    df['매도신호'] = np.nan
-    df['매도호가'] = np.nan
-    df['매도체결가'] = np.nan
-    df['매수그룹'] = np.nan
-    df['매수횟수'] = np.nan
-    df['보유여부'] = np.nan
-    df['보유현금'] = bet
-    df['매수금액'] = np.nan
-    df['총매수'] = np.nan
-    df['보유수량'] = np.nan
-    df['총평가'] = int(0)
-    df['수익률'] = np.nan
-    df['최고수익률'] = np.nan
-    # df['최고대비'] = np.nan
-    df['수익금'] = float(0)
-    df['수수료'] = int(0)
-    df['매수시간'] = int(0)
-    df['매도시간'] = np.nan
-    df['보유시간'] = np.nan
-    df['손절'] = np.nan
-    df['손절가'] = np.nan
-
-    length = len(df.index)
-    ing_before=0
     df=buy_stg(df)
     df.loc[(df['매수신호'].shift(1) > 0) & (df.매수체결가>0), '보유여부'] = True
     df['매수체결가'].ffill(inplace=True) # NaN값을 윗 값으로 채움
@@ -477,6 +474,7 @@ if __name__ == '__main__':
                 for rsi in rsis:
                     for high_ratio in high_ratios:
                         for trail in trailings:
+                            df = df_col(df)
                             df_back,df_result = df_backtest(df,ticker)
                             if optimization == True:
                                 make_vc_db(df_result,ticker)

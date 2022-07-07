@@ -223,7 +223,7 @@ def RSI(df):
     return df
 
 def BBAND(df):
-    df['band_upper'],df['band_middle'],df['band_lower'] = talib.BBANDS(df['close'],20,2)
+    df['band_upper'],df['band_middle'],df['band_lower'] = round(talib.BBANDS(df['close'],20,2),2)
     return df
 
 def ATR(df):
