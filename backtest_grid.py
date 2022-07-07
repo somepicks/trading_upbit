@@ -9,7 +9,7 @@ pd.set_option('display.max_columns',None) #모든 열을 보고자 할 때
 pd.set_option('display.width',1500)
 pd.set_option("display.unicode.east_asian_width", True)
 def df_col(df):
-    df = df[['open', 'high', 'low', 'close','rsi', '고저평균대비등락율','hmao_20','hmac_20','band_lower']]
+    df = df[['open', 'high', 'low', 'close','rsi', '고저평균대비등락율']]
     df['매수신호'] = np.nan
     df['매수호가'] = np.nan
     df['매수체결가'] = np.nan
@@ -67,7 +67,7 @@ def sell_stg(df,i):
     # quit()
     # df.loc[(df.close > df.band_upper) & (df.rsi > 70) ,'매매신호'] = False
     # df.loc[(df.cmo_20 < df.cmo_30) & (df.hmac_5 <= df.hmao_5) ,'매매신호'] = False
-    df.loc[(df.매수그룹==i)&(df['수익률']>sell_per) & (df['수익률'] < df['최고수익률'] * trail ) ,'매도신호'] = True
+    df.loc[(df.매수그룹==i)&(df['수익률']>margin) & (df['수익률'] < df['최고수익률'] * trail ) ,'매도신호'] = True
 
     # df.loc[(df.close < df.band_middle),'매매신호'] = False
     # df.loc[(df['매매신호'].shift(1)==True),'매매신호'] = False
@@ -215,10 +215,12 @@ def df_backtest(df,ticker):
     df.loc[(df.보유여부==0)&(df.매수신호==1),'매도시간'] = np.nan
     # make_detail_db(df, ticker)
     wallet = 0
-    if np.isnan(df.loc[df.index[-1],'매수금액']):
+    make_detail_db(df,ticker)
+    # quit()
+    if df.loc[df.index[-1],'매수금액'] is None: #마지막행 보유 시 일괄 매도
         wallet = df.loc[df.index[-1],'보유현금']
 
-    if not np.isnan(df.loc[df.index[-1],'매수금액']):         #마지막행 보유 시 일괄 매도
+    elif df.loc[df.index[-1],'매수금액'] is not None:         #마지막행 보유 시 일괄 매도
         commission_sell = round(df.loc[df.index[-1],'총평가']*fee_sell*0.01)
         wallet = df.loc[df.index[-1],'보유현금'] + df.loc[df.index[-1],'총평가']-commission_sell
         df.loc[df.index[-1],'매도시간'] = df.index[-1]
@@ -241,8 +243,8 @@ def df_backtest(df,ticker):
     origin_ror = round((origin_close-origin_open)/origin_open*100,2)
     max_bet = round(df['총매수'].max(),2)
     max_buy = round(df['매수횟수'].max(),2)
-    print(f'{ticker}-배팅배수: {bet_m}, rsi: {rsi}, 고저대비: {high_ratio}, 트레일링스탑: {trail},최소마진{sell_per}, 수익률: {ror}, 수익금: {benefit}, 수수료: {commission}, 매수신호횟수: {signal},매수체결횟수:{lock_buy},매도체결횟수:{lock_sell}, 매수최고금액: {max_bet}, 최대매수횟수: {max_buy}, 최고수익률: {maximum}, 최저수익률: {minimum}, 단순보유수익률: {origin_ror} ')
-    dict_result = {'ticker':[ticker],'배팅배수':[bet_m],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'최소마진':[sell_per],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수신호횟수':[signal],'매수체결횟수':[lock_buy],'매도체결횟수':[lock_sell],'매수최고금액':[max_bet],'최대매수횟수':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
+    print(f'{ticker}-배팅배수: {bet_m}, rsi: {rsi}, 고저대비: {high_ratio}, 트레일링스탑: {trail}, 최소마진: {margin}, 수익률: {ror}, 수익금: {benefit}, 수수료: {commission}, 매수신호횟수: {signal},매수체결횟수:{lock_buy},매도체결횟수:{lock_sell}, 매수최고금액: {max_bet}, 최대매수횟수: {max_buy}, 최고수익률: {maximum}, 최저수익률: {minimum}, 단순보유수익률: {origin_ror} ')
+    dict_result = {'ticker':[ticker],'배팅배수':[bet_m],'rsi':[rsi],'고저대비':[high_ratio],'트레일링스탑':[trail],'최소마진':[margin],'수익률':[ror],'수익금':[benefit],'수수료':[commission],'매수신호횟수':[signal],'매수체결횟수':[lock_buy],'매도체결횟수':[lock_sell],'매수최고금액':[max_bet],'최대매수횟수':[max_buy],'최고수익률':[maximum],'최저수익률':[minimum]}
     dt_now = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
     df_result = pd.DataFrame(dict_result, index=[dt_now])
     df.dropna(subset=['보유여부'],axis=0,inplace=True) #보유여부가 nan인 행을 찾아 삭제
@@ -298,7 +300,7 @@ def make_back_db(df,df_result,ticker):
     con.close()
     return df_result
 
-def make_vc_db(df_result,ticker):
+def make_opt_db(df_result,ticker):
     df_result.rename(index={df_result.index[0]:index_num},inplace=True) #인덱스 이름 바꾸기
     back_grid_con = sqlite3.connect(db_optimization)
     df_result.to_sql('coins_vc_' + ticker + '_grid2', back_grid_con, if_exists='append')
@@ -423,14 +425,13 @@ def hogaUnitCalc_per(hogaPrice):
 
 if __name__ == '__main__':
     db_path = 'D:/db_files/'
-    db_ohlcv = db_path + 'upbit.db'
+    db_ohlcv = db_path + 'upbit_ohlcv.db'
     db_back = db_path + 'upbit_backtest.db'
     db_back_detail = db_path + 'upbit_backtest_grid_detail.db'
     db_optimization = db_path + 'upbit_backtest_grid_최적화.db'
     index_num = 0
 
-    get_con = sqlite3.connect(db_ohlcv)
-    cur = get_con.cursor()
+
 
     buy_hoga = -1 #매수호가
     sell_hoga = 1 #매도호가
@@ -443,45 +444,46 @@ if __name__ == '__main__':
     fee_buy = 0.05 # %
     fee_sell = 0.05 # %
     loss_per = -50
-    optimization = True
+    optimization = None
 
     if optimization == True:
         bet_multiple = [1.2]
         rsis = [40]
         high_ratios = [-0.15]
         trailings = [0.8]
-        sell_pers = [0.3,0.5,0.7,0.9,1.2,1.5] #매도 수익률
+        margins = [0.3,0.5,0.7,0.9,1.2,1.5] #매도 수익률
     else:
         bet_multiple = [1.2]
-        rsis = [35]
+        rsis = [40]
         high_ratios = [-0.15]
-        trailings = [0.7]
-        sell_pers = [1] #매도 수익률
+        trailings = [0.8]
+        margins = [0.5]
 
 
     df_amount = pd.DataFrame()
+    get_con = sqlite3.connect(db_ohlcv)
+    cur = get_con.cursor()
     # tickers= get_ticker_list(cur,interval)
     # print(tickers)
     tickers =['BTC-'+interval]
     for ticker in tickers:
         start = time.time()
-        df = pd.read_sql(f"SELECT * FROM '{ticker}'", get_con).set_index('index')
+        df_ohlcv = pd.read_sql(f"SELECT * FROM '{ticker}'", get_con).set_index('index')
+        df_ohlcv = df_col(df_ohlcv)
         # df = df_add(df)
-        get_con.close()
         # df = df.iloc[1640:]
         for bet_m in bet_multiple:
-            for sell_per in sell_pers:
+            for margin in margins:
                 for rsi in rsis:
                     for high_ratio in high_ratios:
                         for trail in trailings:
-                            df = df_col(df)
-                            df_back,df_result = df_backtest(df,ticker)
+                            df_back,df_result = df_backtest(df_ohlcv,ticker)
                             if optimization == True:
-                                make_vc_db(df_result,ticker)
+                                make_opt_db(df_result,ticker)
                                 index_num = index_num+1
                             elif optimization == False:
-                                # make_detail_db(df_back,ticker)
                                 make_back_db(df_back, df_result, ticker)
+        get_con.close()
 
     # df_result = make_back_db(df_amount)
     # print(df_result)

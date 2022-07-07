@@ -22,7 +22,7 @@ from pprint import pprint
 # con.commit()
 if __name__ == '__main__':
     db_path = "D:/db_files/"
-    db_ohlcv = db_path + 'upbit.db'
+    db_ohlcv = db_path + 'upbit_ohlcv.db'
     con = sqlite3.connect(db_ohlcv)
     cur = con.cursor()
     cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
